@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   urdf
+  ur5_robot
 )
 
 ## System dependencies are found with CMake's conventions
