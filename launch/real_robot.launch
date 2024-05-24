@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<launch>
+<!-- Set the robot IP address and calibration file-->
+<arg name="robot_ip" default="169.254.120.2" doc="IP address by which the robot can be reached."/>
+<arg name="kinematics_config" default="$(find ur5_robot)/config/my_robot_calibration.yaml" doc="Kinematics config file used for calibration correction. This will be used to verify the robot's calibration is matching the robot_description."/>
+
+<!-- Launch robot and moveit nodes -->
+<include file="$(find ur_robot_driver)/launch/ur5_bringup.launch" pass_all_args="true"></include>
+
+<!-- Run the main MoveIt executable without trajectory execution (we do not have controllers configured by default) -->
+<arg name="load_robot_description" default="true"/>
+<!-- By default, we are not in debug mode -->
+<arg name="debug" default="false" />
+<arg name="moveit_controller_manager" value="ros_control" />
+<!-- Set execution mode for fake execution controllers -->
+<arg name="fake_execution_type" default="interpolate" />
+<arg name="pipeline" default="ompl" />
+
+<include file="$(find ur_gripper_moveit)/launch/move_group.launch">
+<arg name="allow_trajectory_execution" value="true"/>
+<arg name="moveit_controller_manager" value="$(arg moveit_controller_manager)" />
+<arg name="fake_execution_type" value="$(arg fake_execution_type)"/>
+<arg name="info" value="true"/>
+<arg name="debug" value="$(arg debug)"/>
+<arg name="pipeline" value="$(arg pipeline)"/>
+<arg name="load_robot_description" value="$(arg load_robot_description)"/>
+</include>
+
+<arg name="use_rviz" default="true" />
+<!-- Run Rviz and load the default config to see the state of the move_group node -->
+<include file="$(find ur_gripper_moveit)/launch/moveit_rviz.launch" if="$(arg use_rviz)">
+<arg name="rviz_config" value="$(dirname)/moveit.rviz"/>
+<arg name="debug" value="$(arg debug)"/>
+</include>
+
+
+<!-- Set Moveit Scenes -->
+<node name="set_moveit_scenes" pkg="ur5_robot_gripper" type="moveit_scene.py" output="screen"/>
+<!-- Start Robotiq controller -->
+<node name="robotiq_85_controller" pkg="robotiq_gripper" type="gripper_controller.py" output="screen"/>
+
+<!-- Start Robot node -->
+<node name="robot_node" pkg="ur5_robot_gripper" type="robot_control.py" output="screen"/>
+</launch>
