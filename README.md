@@ -6,3 +6,6 @@
 > - Luanch
 >   - 一个简单的可视化launch文件
 >   - 启动抓取环境的lanuch文件, 依赖[src/ur5_gripper_moveit](../ur5_gripper_moveit)以及[src/robotiq_gripper](../robotiq_gripper)
+
+## ToDo
+- [ ] Use slider to control joints (like robotiq_gripper)
