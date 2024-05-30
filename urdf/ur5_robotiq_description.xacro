@@ -8,7 +8,7 @@
     <xacro:include filename="$(find robotiq_gripper)/urdf/robotiq_85_gripper.urdf.xacro" />
 
     <xacro:robotiq_85_gripper prefix="" parent="tool0" >
-    <origin xyz="0 0 0.004" rpy="0 ${-pi/2} ${pi}"/>
+    <origin xyz="0 0 0.004" rpy="0 ${-pi/2} ${pi/2}"/>
     </xacro:robotiq_85_gripper> 
 
 </robot>
