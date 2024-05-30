@@ -7,7 +7,7 @@
     <!-- Set the robot IP address and calibration file-->
     <arg name="robot_ip" default="169.254.120.2" doc="IP address by which the robot can be reached."/>
     <arg name="kinematics_config" default="$(find ur5_robot)/config/my_robot_calibration.yaml" doc="Kinematics config file used for calibration correction. This will be used to verify the robot's calibration is matching the robot_description."/>
-    <include file="$(find ur_robot_driver)/launch/ur5_bringup.launch">
+    <include file="$(find ur5_robot_gripper)/launch/ur5_bringup.launch">
     <arg name="robot_ip" value="$(arg robot_ip)"/>
     <arg name="kinematics_config" value="$(arg kinematics_config)"/>
     </include>
