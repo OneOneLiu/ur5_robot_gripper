@@ -36,7 +36,8 @@
 <arg name="device_name" default="/dev/ttyUSB0"/>
 <node name="robotiq_2f_gripper_driver_node" pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py" output="screen" args="$(arg device_name)" />
 <!-- Create a fake joint_states publisher for the gripper -->
-<node name="robotiq_2f_gripper_joint_publisher" pkg="robotiq_gripper" type="gripper_joint_state_publisher.py" output="screen" args="$(arg device_name)" />
+<node name="robotiq_2f_gripper_joint_publisher" pkg="robotiq_gripper" type="gripper_joint_state_publisher.py" output="screen" />
+<node name="robotiq_2f_joint_controller" pkg="robotiq_gripper" type="real_gripper_control.py" output="screen" />
 
 <!-- Start joint state publisher (merge joint states from two sources: robot and gripper) -->
 <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" output="screen">
