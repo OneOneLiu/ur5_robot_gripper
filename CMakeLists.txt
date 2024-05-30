@@ -162,7 +162,7 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   src/robot_control.py
-  src/keyboard_listener.py
+  src/moveit_scene.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
