@@ -13,6 +13,10 @@
     </include>
 </group>
 
+<!-- Remap controller service for moveit to control the robot in the namespace "ur_robot" (I don't think this is an elegant implementation, and may update it later) -->
+<remap from="/controller_manager/list_controllers" to="/ur5_robot/controller_manager/list_controllers"/>
+<remap from="/pos_joint_traj_controller/follow_joint_trajectory" to="/ur5_robot/pos_joint_traj_controller/follow_joint_trajectory"/>
+
 <!-- Launch MoveIt -->
 <arg name="load_robot_description" default="true"/>
 <!-- By default, we are not in debug mode -->
@@ -31,6 +35,7 @@
 <arg name="pipeline" value="$(arg pipeline)"/>
 <arg name="load_robot_description" value="$(arg load_robot_description)"/>
 </include>
+
 
 <!-- Start Robotiq controller -->
 <arg name="device_name" default="/dev/ttyUSB0"/>
