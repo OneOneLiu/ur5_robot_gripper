@@ -47,6 +47,12 @@ RUN cd /catkin_ws/src && \
     git clone https://github.com/OneOneLiu/ur5_robot.git && \
     git clone https://github.com/OneOneLiu/ur5_gripper_moveit.git
 
+# Sync the cloned repositories every time the container is started
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bash"]
+
 # Use rosdep to install all dependencies according to the package.xml files in all src folders
 # And compile the workspace
 RUN cd /catkin_ws && \
