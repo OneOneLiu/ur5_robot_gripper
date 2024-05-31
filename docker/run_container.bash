@@ -12,6 +12,7 @@ docker run --rm -it \
     --env="QT_X11_NO_MITSHM=1" \
     --env="XAUTHORITY=$XAUTH" \
     --volume="/home/$USER/catkin_ws/src/ur5_robot_gripper/:/catkin_ws/src/ur5_robot_gripper" \
+    --volume="/home/$USER/.ssh_docker:/root/.ssh/" \
     --volume="/dev/bus/usb:/dev/bus/usb" \
     --volume="/tmp/.docker.xauth:/tmp/.docker.xauth:rw" \
     --net=host \
