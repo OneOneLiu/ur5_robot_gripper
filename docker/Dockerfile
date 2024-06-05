@@ -53,6 +53,14 @@ RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
 
+# Fix issues when using remote server from ssh **Start**
+## Fix network setup
+ENV ROS_HOSTNAME=localhost
+ENV ROS_MASTER_URI=http://localhost:11311
+# For correct configure QT library on the remote server
+RUN strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5
+# Fix issues when using remote server from ssh End** 
+
 # Use rosdep to install all dependencies according to the package.xml files in all src folders
 # And compile the workspace
 RUN cd /catkin_ws && \
@@ -63,12 +71,5 @@ RUN cd /catkin_ws && \
 RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc && \
     echo "source /catkin_ws/devel/setup.bash" >> /root/.bashrc
 
-# Fix issues when using remote server from ssh **Start**
-## Fix network setup
-ENV ROS_HOSTNAME=localhost
-ENV ROS_MASTER_URI=http://localhost:11311
-# For correct configure QT library on the remote server
-RUN strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5
-# Fix issues when using remote server from ssh End** 
 
 RUN echo "ALL Done"
