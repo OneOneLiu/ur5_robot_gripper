@@ -9,7 +9,7 @@
 <!-- Set Moveit Scenes -->
 <node name="set_moveit_scenes" pkg="ur5_robot_gripper" type="moveit_scene.py" output="screen"/>
 <!-- Start Robotiq controller -->
-<node name="robotiq_85_controller" pkg="robotiq_gripper" type="gripper_controller.py" output="screen"/>
+<node name="robotiq_85_controller" pkg="robotiq_gripper" type="sim_gripper_control.py" output="screen"/>
 
 <!-- Start Robot node -->
 <node name="robot_node" pkg="ur5_robot_gripper" type="robot_control.py" output="screen"/>
