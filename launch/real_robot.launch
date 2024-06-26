@@ -57,6 +57,6 @@
 <arg name="debug" value="$(arg debug)"/>
 </include>
 <!-- Set Moveit Scenes -->
-<node name="set_moveit_scenes" pkg="ur5_robot_gripper" type="moveit_scene.py" output="screen"/>
+<!-- <node name="set_moveit_scenes" pkg="ur5_robot_gripper" type="moveit_scene.py" output="screen"/> -->
 
 </launch>
