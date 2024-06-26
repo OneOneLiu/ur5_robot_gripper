@@ -5,8 +5,8 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Status1
-        - /MotionPlanning1
         - /MotionPlanning1/Planning Request1
+        - /TF1/Frames1
       Splitter Ratio: 0.5
     Tree Height: 267
   - Class: rviz/Selection
@@ -55,7 +55,7 @@ Visualization Manager:
     - Acceleration_Scaling_Factor: 0.1
       Class: moveit_rviz_plugin/MotionPlanning
       Enabled: true
-      JointsTab_Use_Radians: false
+      JointsTab_Use_Radians: true
       Move Group Namespace: ""
       MoveIt_Allow_Approximate_IK: false
       MoveIt_Allow_External_Program: false
@@ -106,6 +106,16 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
+          frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          realsense:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
           robotiq_85_base_link:
             Alpha: 1
             Show Axes: false
@@ -151,6 +161,11 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
+          scanner:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
           shoulder_link:
             Alpha: 1
             Show Axes: false
@@ -165,6 +180,10 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
+          world:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
           wrist_1_link:
             Alpha: 1
             Show Axes: false
@@ -203,8 +222,8 @@ Visualization Manager:
         Goal State Color: 250; 128; 0
         Interactive Marker Size: 0
         Joint Violation Color: 255; 0; 255
-        Planning Group: gripper
-        Query Goal State: false
+        Planning Group: manipulator
+        Query Goal State: true
         Query Start State: false
         Show Workspace: false
         Start State Alpha: 1
@@ -248,6 +267,16 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
+          frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          realsense:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
           robotiq_85_base_link:
             Alpha: 1
             Show Axes: false
@@ -293,6 +322,11 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
+          scanner:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
           shoulder_link:
             Alpha: 1
             Show Axes: false
@@ -307,6 +341,10 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
+          world:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
           wrist_1_link:
             Alpha: 1
             Show Axes: false
@@ -343,6 +381,91 @@ Visualization Manager:
       Update Interval: 0
       Value: false
       Visual Enabled: true
+    - Class: rviz/TF
+      Enabled: true
+      Filter (blacklist): ""
+      Filter (whitelist): ""
+      Frame Timeout: 15
+      Frames:
+        All Enabled: false
+        base:
+          Value: false
+        base_link:
+          Value: false
+        base_link_inertia:
+          Value: false
+        flange:
+          Value: false
+        forearm_link:
+          Value: false
+        frame:
+          Value: false
+        realsense:
+          Value: false
+        robotiq_85_base_link:
+          Value: false
+        robotiq_85_left_finger_link:
+          Value: false
+        robotiq_85_left_knuckle_link:
+          Value: false
+        robotiq_85_right_finger_link:
+          Value: false
+        robotiq_85_right_knuckle_link:
+          Value: false
+        scanner:
+          Value: false
+        shoulder_link:
+          Value: false
+        tool0:
+          Value: false
+        tool0_controller:
+          Value: false
+        upper_arm_link:
+          Value: false
+        world:
+          Value: true
+        wrist_1_link:
+          Value: false
+        wrist_2_link:
+          Value: false
+        wrist_3_link:
+          Value: false
+      Marker Alpha: 1
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        robotiq_85_left_knuckle_link:
+          robotiq_85_left_finger_link:
+            {}
+        robotiq_85_right_knuckle_link:
+          robotiq_85_right_finger_link:
+            {}
+        world:
+          frame:
+            base_link:
+              base:
+                tool0_controller:
+                  {}
+              base_link_inertia:
+                shoulder_link:
+                  upper_arm_link:
+                    forearm_link:
+                      wrist_1_link:
+                        wrist_2_link:
+                          wrist_3_link:
+                            flange:
+                              tool0:
+                                realsense:
+                                  {}
+                                robotiq_85_base_link:
+                                  {}
+            scanner:
+              {}
+      Update Interval: 0
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -371,7 +494,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 2.074856758117676
+      Distance: 7.396892547607422
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -379,17 +502,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -0.15694834291934967
-        Y: -0.1760467290878296
-        Z: 0.23546312749385834
+        X: 0.5738229155540466
+        Y: -0.403163880109787
+        Z: 0.3604978322982788
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.3153977692127228
+      Pitch: 0.30539777874946594
       Target Frame: <Fixed Frame>
-      Yaw: 0.38540157675743103
+      Yaw: 3.6153998374938965
     Saved: ~
 Window Geometry:
   Displays:
