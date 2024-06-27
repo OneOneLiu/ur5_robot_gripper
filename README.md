@@ -9,3 +9,6 @@
 
 ## ToDo
 - [ ] Use slider to control joints (like robotiq_gripper)
+- [ ] 使用真实机器人的注意事项
+  - [ ] 如何添加真实场景 （校对）
+  - [ ] 速度要慢，有关线
