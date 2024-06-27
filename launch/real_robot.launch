@@ -48,6 +48,7 @@
 <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" output="screen">
 <rosparam param="source_list">["/ur5_robot/joint_states","/gripper/joint_states"]</rosparam>
 </node>
+<node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
 
 <!-- Start RViz for visualization -->
 <arg name="use_rviz" default="true" />
