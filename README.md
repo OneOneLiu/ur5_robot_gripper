@@ -1,14 +1,5 @@
-# UR5 机器人与Robotiq 2F-85 夹爪模型
+# Readme.md
 
-> 本软件包提供
-> - 机器人与夹爪的联合模型文件
-> - 使用python编写的moveit运动控制接口. 具体的运动规划使用请查看[src/ur5_gripper_moveit](../ur5_gripper_moveit)
-> - Luanch
->   - 一个简单的可视化launch文件
->   - 启动抓取环境的lanuch文件, 依赖[src/ur5_gripper_moveit](../ur5_gripper_moveit)以及[src/robotiq_gripper](../robotiq_gripper)
+这个本来是想仿照这ros来写一个基于python的机器人和夹爪控制的, 但是现在发现moveit2 的python binding支持还不是很好, 而且我只需要基本的控制功能, 所以直接用C++来写了. 等以后python binding支持变好了再回来.
 
-## ToDo
-- [ ] Use slider to control joints (like robotiq_gripper)
-- [ ] 使用真实机器人的注意事项
-  - [ ] 如何添加真实场景 （校对）
-  - [ ] 速度要慢，有关线
+那些meshes, urdf文件还是在这里.
