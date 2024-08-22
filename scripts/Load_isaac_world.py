@@ -73,24 +73,30 @@ if assets_root_path is None:
 print(assets_root_path)
 from omni.isaac.core.utils.stage import add_reference_to_stage
 tube75_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/tube75/tube75.usd"
-for i in range (13):
-    add_reference_to_stage(usd_path=tube75_asset_path, prim_path="/World/tube75/tube75_{}".format(i))
-    object_prim = stage.GetPrimAtPath("/World/tube75/tube75_{}".format(i))
-    # 添加平移：https://forums.developer.nvidia.com/t/add-and-transform-usd-assets-in-python/250701/4
-    xformable = UsdGeom.Xformable(object_prim)
-    xformable.SetXformOpOrder([])
-    translateop = xformable.AddTranslateOp()
-    translateop.Set(Gf.Vec3d(0.5, 0.1, 0.1+0.05*i))
+for i in range (7):
+    for j in range(2):
+        add_reference_to_stage(usd_path=tube75_asset_path, prim_path="/World/tube75/tube75_{}_{}".format(i,j))
+        object_prim = stage.GetPrimAtPath("/World/tube75/tube75_{}_{}".format(i,j))
+        # 添加平移：https://forums.developer.nvidia.com/t/add-and-transform-usd-assets-in-python/250701/4
+        xformable = UsdGeom.Xformable(object_prim)
+        xformable.SetXformOpOrder([])
+        translateop = xformable.AddTranslateOp()
+        translateop.Set(Gf.Vec3d(0.5 +0.1*j, 0.05+0.025*j, 0.05+0.035*i))
+        if j:
+            xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(180.0, 0.0, 0.0))
 
 tube100_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/tube100/tube100.usd"
-for i in range (13):
-    add_reference_to_stage(usd_path=tube100_asset_path, prim_path="/World/tube100/tube100_{}".format(i))
-    object_prim = stage.GetPrimAtPath("/World/tube100/tube100_{}".format(i))
-    # 添加平移：https://forums.developer.nvidia.com/t/add-and-transform-usd-assets-in-python/250701/4
-    xformable = UsdGeom.Xformable(object_prim)
-    xformable.SetXformOpOrder([])
-    translateop = xformable.AddTranslateOp()
-    translateop.Set(Gf.Vec3d(0.5, 0.1, 0.13+0.05*i))
+for i in range (7):
+    for j in range(2):
+        add_reference_to_stage(usd_path=tube100_asset_path, prim_path="/World/tube100/tube100_{}_{}".format(i,j))
+        object_prim = stage.GetPrimAtPath("/World/tube100/tube100_{}_{}".format(i,j))
+        # 添加平移：https://forums.developer.nvidia.com/t/add-and-transform-usd-assets-in-python/250701/4
+        xformable = UsdGeom.Xformable(object_prim)
+        xformable.SetXformOpOrder([])
+        translateop = xformable.AddTranslateOp()
+        translateop.Set(Gf.Vec3d(0.5 + 0.1*j,  0.075+0.025*j, 0.1+0.035*i))
+        # if j:
+        #     xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(180.0, 0.0, 0.0))
 
 tray_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/tray/tray.usd"
 add_reference_to_stage(usd_path=tray_asset_path, prim_path="/World/tray")
@@ -144,7 +150,7 @@ xformable.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))
 #             ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
 #             ("SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
 #             ("SubscribeJointState.outputs:velocityCommand", "ArticulationController.inputs:velocityCommand"),
-#             ("SubscribeJointState.outputs:effortCommand", "ArticulationController.inputs:effortCommand"),
+#             ("SubscribeJointState.outputs:effortCommand", "ArticulationController.inputs:effortCommand"),s
 #         ],
 #         og.Controller.Keys.SET_VALUES: [
 #             # Providing path to /panda robot to Articulation Controller node
@@ -157,8 +163,8 @@ xformable.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))
 # )
 
 # Add camera
-# cameraPath = defaultPrimPath + "/Camera"
-#         camera = UsdGeom.Camera.Define(stage, cameraPath)
-#         camera.AddTranslateOp().Set(Gf.Vec3d(0.0, 0.2, 2))
-#         camera.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(0.0, 0.0, 0.0))
-#         self.demo_camera = cameraPath
+cameraPath = "/Camera"
+camera = UsdGeom.Camera.Define(stage, cameraPath)
+camera.AddTranslateOp().Set(Gf.Vec3d(1.3, 0.35, 1.3))
+camera.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(30.0, 10.0, 95.0))
+demo_camera = cameraPath
