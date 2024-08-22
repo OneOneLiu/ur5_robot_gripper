@@ -208,5 +208,11 @@ camera.AddTranslateOp().Set(Gf.Vec3d(0.5, -0.32, 1.4))
 camera.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(0., 0.0, 0.0))
 demo_camera = cameraPath
 
+# Add camera on top
+cameraPath = "/Camera/Camera_on_top"
+camera = UsdGeom.Camera.Define(stage, cameraPath)
+camera.AddTranslateOp().Set(Gf.Vec3d(0.55, 0.015, 1.35))
+camera.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(0., 0.0, 90.0))
+demo_camera = cameraPath
 # 抓取物体
 # https://forums.developer.nvidia.com/t/object-gripping-and-picking/291963/6
