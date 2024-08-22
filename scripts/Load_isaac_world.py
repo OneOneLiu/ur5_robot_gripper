@@ -177,7 +177,8 @@ for j in range (4):
 # load obj:
 # https://forums.developer.nvidia.com/t/how-to-conveniently-import-obj-files-via-python-scripts/204692/6
 
-# Add articulation controller
+# Add Omini graph
+# https://docs.omniverse.nvidia.com/isaacsim/latest/ros2_tutorials/tutorial_ros2_manipulation.html?highlight=RCLPy#ros2-joint-control-extension-python-scripting
 import omni.graph.core as og
 og.Controller.edit(
     {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
