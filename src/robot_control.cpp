@@ -1,7 +1,77 @@
+#include <iostream>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <geometry_msgs/msg/pose.hpp>
+
+class RobotMover
+{
+public:
+  RobotMover(const rclcpp::Node::SharedPtr& node)
+  : move_group_interface_(node, "manipulator")
+  {
+    // 初始化 MoveGroupInterface
+  }
+
+  // 方法1：移动到指定位置和姿态
+  void moveToPose(double px, double py, double pz, double qx, double qy, double qz, double qw)
+  {
+    geometry_msgs::msg::Pose target_pose;
+    target_pose.position.x = px;
+    target_pose.position.y = py;
+    target_pose.position.z = pz;
+    target_pose.orientation.x = qx;
+    target_pose.orientation.y = qy;
+    target_pose.orientation.z = qz;
+    target_pose.orientation.w = qw;
+
+    move_group_interface_.setPoseTarget(target_pose);
+    executePlan();
+  }
+
+  // 方法2：保持当前姿态，移动到指定的位置
+  void moveToPosition(double px, double py, double pz)
+  {
+    auto current_pose = move_group_interface_.getCurrentPose().pose;
+    current_pose.position.x = px;
+    current_pose.position.y = py;
+    current_pose.position.z = pz;
+
+    move_group_interface_.setPoseTarget(current_pose);
+    executePlan();
+  }
+  // 方法3：打印当前的姿态
+  void printCurrentPose()
+  {
+    auto current_pose = move_group_interface_.getCurrentPose().pose;
+    std::cout << "Current Pose:" << std::endl;
+    std::cout << "Position: (" << current_pose.position.x << ", "
+              << current_pose.position.y << ", "
+              << current_pose.position.z << ")" << std::endl;
+    std::cout << "Orientation: (" << current_pose.orientation.x << ", "
+              << current_pose.orientation.y << ", "
+              << current_pose.orientation.z << ", "
+              << current_pose.orientation.w << ")" << std::endl;
+  }
+
+private:
+  moveit::planning_interface::MoveGroupInterface move_group_interface_;
+
+  void executePlan()
+  {
+    auto const [success, plan] = [&]{
+      moveit::planning_interface::MoveGroupInterface::Plan msg;
+      auto const ok = static_cast<bool>(move_group_interface_.plan(msg));
+      return std::make_pair(ok, msg);
+    }();
+
+    if (success) {
+      move_group_interface_.execute(plan);
+    } else {
+      RCLCPP_ERROR(rclcpp::get_logger("robot_control"), "Planning failed!");
+    }
+  }
+};
 
 int main(int argc, char * argv[])
 {
@@ -12,45 +82,45 @@ int main(int argc, char * argv[])
     rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true)
   );
 
-  // Create a ROS logger
-  auto const logger = rclcpp::get_logger("robot_control");
+  // Create and start the multi-threaded executor
+  rclcpp::executors::MultiThreadedExecutor executor;
+  executor.add_node(node);
+  std::thread executor_thread([&executor]() { executor.spin(); });
 
-  // Create the MoveIt MoveGroup Interface
-  using moveit::planning_interface::MoveGroupInterface;
-  auto move_group_interface = MoveGroupInterface(node, "manipulator");
+  // 创建 RobotMover 实例
+  RobotMover robot_mover(node);
 
-  // Parse command-line arguments for the target pose
-  if (argc < 7) {
-    RCLCPP_ERROR(logger, "Usage: robot_moveit <px> <py> <pz> <qx> <qy> <qz> <qw>");
-    return 1;
-  }
+  // 选择调用的方法
+  std::cout << "Choose the method to call:\n";
+  std::cout << "1: Move to a specified pose (position and orientation)\n";
+  std::cout << "2: Move to a position while maintaining the current orientation\n";
+  std::cout << "3: Print the current pose\n";
+  int choice;
+  std::cin >> choice;
 
-  auto const target_pose = [&]{
-    geometry_msgs::msg::Pose msg;
-    msg.position.x = std::stof(argv[1]);
-    msg.position.y = std::stof(argv[2]);
-    msg.position.z = std::stof(argv[3]);
-    msg.orientation.x = std::stof(argv[4]);
-    msg.orientation.y = std::stof(argv[5]);
-    msg.orientation.z = std::stof(argv[6]);
-    msg.orientation.w = std::stof(argv[7]);
-    return msg;
-  }();
+  if (choice == 1) {
+    // 获取用户输入的目标位置和姿态
+    double px, py, pz, qx, qy, qz, qw;
+    std::cout << "Enter position (x, y, z): ";
+    std::cin >> px >> py >> pz;
+    std::cout << "Enter orientation (qx, qy, qz, qw): ";
+    std::cin >> qx >> qy >> qz >> qw;
 
-  move_group_interface.setPoseTarget(target_pose);
+    // 使用方法1移动到指定位置和姿态
+    robot_mover.moveToPose(px, py, pz, qx, qy, qz, qw);
+  } else if (choice == 2) {
+    // 获取用户输入的目标位置
+    double px, py, pz;
+    std::cout << "Enter position (x, y, z): ";
+    std::cin >> px >> py >> pz;
 
-  // Create a plan to that target pose
-  auto const [success, plan] = [&move_group_interface]{
-    moveit::planning_interface::MoveGroupInterface::Plan msg;
-    auto const ok = static_cast<bool>(move_group_interface.plan(msg));
-    return std::make_pair(ok, msg);
-  }();
-
-  // Execute the plan
-  if(success) {
-    move_group_interface.execute(plan);
+    // 使用方法2保持当前姿态，移动到指定位置
+    robot_mover.moveToPosition(px, py, pz);
+  } else if (choice == 3) {
+    // 打印当前的姿态
+    robot_mover.printCurrentPose();
   } else {
-    RCLCPP_ERROR(logger, "Planning failed!");
+    std::cout << "Invalid choice. Exiting.\n";
   }
 
   // Shutdown ROS
