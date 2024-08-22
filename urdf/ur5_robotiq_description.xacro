@@ -11,4 +11,10 @@
     <origin xyz="0 0 0.004" rpy="0 ${-pi/2} ${pi/2}"/>
     </xacro:robotiq_85_gripper> 
 
+    <link name="finger_center"/>
+    <joint name="finger_center_joint" type="fixed">
+        <origin xyz="0 0 0.16" rpy="0 0 0"/>
+        <parent link="tool0"/>
+        <child link="finger_center"/>
+    </joint>
 </robot>
