@@ -61,6 +61,19 @@ mimic_api.GetReferenceJointRel().AddTarget(left_knuckle_joint_path)
 mimic_api.GetGearingAttr().Set(-1.0)  # 1:1的齿轮比率
 mimic_api.GetOffsetAttr().Set(0.0)  # 无偏移
 
+left_finger_tip_joint_path = prim_path + "/robotiq_85_left_inner_knuckle_link/robotiq_85_left_finger_tip_joint"
+left_knuckle_joint_prim = stage.GetPrimAtPath(left_knuckle_joint_path)
+left_finger_tip_joint_prim = stage.GetPrimAtPath(left_finger_tip_joint_path)
+# 获取这些关节的Prim
+# 应用 mimic API 到左内侧关节
+mimic_api = PhysxSchema.PhysxMimicJointAPI.Apply(left_finger_tip_joint_prim.GetPrim(), UsdPhysics.Tokens.rotZ)
+
+# 设置 mimic 目标关节
+mimic_api.GetReferenceJointRel().AddTarget(left_knuckle_joint_path)
+
+# 设置齿轮比率和偏移（根据实际需求调整）
+mimic_api.GetGearingAttr().Set(1.0)  # 1:1的齿轮比率
+mimic_api.GetOffsetAttr().Set(0.0)  # 无偏移
 
 # 访问assets载入桌子
 # https://forums.developer.nvidia.com/t/creating-moving-objects-using-python-scripts/280418
@@ -159,41 +172,38 @@ for j in range (4):
 # https://forums.developer.nvidia.com/t/load-meshes-into-sim/257938/2
 # Create OG graph
 # https://docs.omniverse.nvidia.com/isaacsim/latest/ros_tutorials/tutorial_ros_manipulation.html
-# import omni.graph.core as og
+
 
 # load obj:
 # https://forums.developer.nvidia.com/t/how-to-conveniently-import-obj-files-via-python-scripts/204692/6
-# og.Controller.edit(
-#     {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
-#     {
-#         og.Controller.Keys.CREATE_NODES: [
-#             ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
-#             ("PublishJointState", "omni.isaac.ros_bridge.ROS1PublishJointState"),
-#             ("SubscribeJointState", "omni.isaac.ros_bridge.ROS1SubscribeJointState"),
-#             ("ArticulationController", "omni.isaac.core_nodes.IsaacArticulationController"),
-#             ("ReadSimTime", "omni.isaac.core_nodes.IsaacReadSimulationTime"),
-#         ],
-#         og.Controller.Keys.CONNECT: [
-#             ("OnPlaybackTick.outputs:tick", "PublishJointState.inputs:execIn"),
-#             ("OnPlaybackTick.outputs:tick", "SubscribeJointState.inputs:execIn"),
-#             ("OnPlaybackTick.outputs:tick", "ArticulationController.inputs:execIn"),
 
-#             ("ReadSimTime.outputs:simulationTime", "PublishJointState.inputs:timeStamp"),
+# Add articulation controller
+import omni.graph.core as og
+og.Controller.edit(
+    {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
+    {
+        og.Controller.Keys.CREATE_NODES: [
+            ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
+            ("SubscribeJointState", "omni.isaac.ros2_bridge.ROS2SubscribeJointState"),
+            ("ArticulationController", "omni.isaac.core_nodes.IsaacArticulationController"),
+        ],
+        og.Controller.Keys.CONNECT: [
+            ("OnPlaybackTick.outputs:tick", "ArticulationController.inputs:execIn"),
+            ("OnPlaybackTick.outputs:tick", "SubscribeJointState.inputs:execIn"),
 
-#             ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
-#             ("SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
-#             ("SubscribeJointState.outputs:velocityCommand", "ArticulationController.inputs:velocityCommand"),
-#             ("SubscribeJointState.outputs:effortCommand", "ArticulationController.inputs:effortCommand"),s
-#         ],
-#         og.Controller.Keys.SET_VALUES: [
-#             # Providing path to /panda robot to Articulation Controller node
-#             # Providing the robot path is equivalent to setting the targetPrim in Articulation Controller node
-#             # ("ArticulationController.inputs:usePath", True),      # if you are using an older version of Isaac Sim, you may need to uncomment this line
-#             ("ArticulationController.inputs:robotPath", "/panda"),
-#             ("PublishJointState.inputs:targetPrim", "/panda"),
-#         ],
-#     },
-# )
+
+            ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
+            ("SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
+            ("SubscribeJointState.outputs:velocityCommand", "ArticulationController.inputs:velocityCommand"),
+            ("SubscribeJointState.outputs:effortCommand", "ArticulationController.inputs:effortCommand"),
+        ],
+        og.Controller.Keys.SET_VALUES: [
+            ("ArticulationController.inputs:robotPath", "/ur5_with_robotiq_2f_85"),
+            ("ArticulationController.inputs:targetPrim", "/ur5_with_robotiq_2f_85"),
+            ("SubscribeJointState.inputs:topicName", "/joint_states"),
+        ],
+    },
+)
 
 # Add camera
 cameraPath = "/Camera/Camera1"
