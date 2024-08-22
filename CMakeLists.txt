@@ -9,7 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
-
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_executable(robot_control src/robot_control.cpp)
 target_include_directories(robot_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -33,6 +33,11 @@ ament_target_dependencies(
   gripper_control
   "moveit_ros_planning_interface"
   "rclcpp"
+)
+
+install(PROGRAMS
+  scripts/pub_tf.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 install(TARGETS gripper_control
