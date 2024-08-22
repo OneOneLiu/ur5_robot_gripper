@@ -1,7 +1,7 @@
 #include <memory>
-
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.h>
+#include <geometry_msgs/msg/pose.hpp>
 
 int main(int argc, char * argv[])
 {
@@ -19,15 +19,24 @@ int main(int argc, char * argv[])
   using moveit::planning_interface::MoveGroupInterface;
   auto move_group_interface = MoveGroupInterface(node, "manipulator");
 
-  // Set a target Pose
-  auto const target_pose = []{
+  // Parse command-line arguments for the target pose
+  if (argc < 7) {
+    RCLCPP_ERROR(logger, "Usage: robot_moveit <px> <py> <pz> <qx> <qy> <qz> <qw>");
+    return 1;
+  }
+
+  auto const target_pose = [&]{
     geometry_msgs::msg::Pose msg;
-    msg.orientation.w = 1.0;
-    msg.position.x = 0.28;
-    msg.position.y = -0.2;
-    msg.position.z = 0.5;
+    msg.position.x = std::stof(argv[1]);
+    msg.position.y = std::stof(argv[2]);
+    msg.position.z = std::stof(argv[3]);
+    msg.orientation.x = std::stof(argv[4]);
+    msg.orientation.y = std::stof(argv[5]);
+    msg.orientation.z = std::stof(argv[6]);
+    msg.orientation.w = std::stof(argv[7]);
     return msg;
   }();
+
   move_group_interface.setPoseTarget(target_pose);
 
   // Create a plan to that target pose
@@ -41,7 +50,7 @@ int main(int argc, char * argv[])
   if(success) {
     move_group_interface.execute(plan);
   } else {
-    RCLCPP_ERROR(logger, "Planing failed!");
+    RCLCPP_ERROR(logger, "Planning failed!");
   }
 
   // Shutdown ROS
