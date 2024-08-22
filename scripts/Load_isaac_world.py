@@ -133,6 +133,27 @@ translateop.Set(Gf.Vec3d(0.4, -0.38, -0.002))
 xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(0.0, 0.0, 0.0))
 
 xformable.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))
+
+# Load demo tubes to racks
+
+for j in range (4):
+        add_reference_to_stage(usd_path=tube75_asset_path, prim_path="/World/tube75/tube75_{}_{}".format(i,j))
+        object_prim = stage.GetPrimAtPath("/World/tube75/tube75_{}_{}".format(i,j))
+        # 添加平移：https://forums.developer.nvidia.com/t/add-and-transform-usd-assets-in-python/250701/4
+        xformable = UsdGeom.Xformable(object_prim)
+        xformable.SetXformOpOrder([])
+        translateop = xformable.AddTranslateOp()
+        translateop.Set(Gf.Vec3d(0.4+0.013+0.016*14, -0.38+0.022+0.016*j, 0.12))
+        xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(90.0, 0.0, 0.0))
+for j in range (4):
+        add_reference_to_stage(usd_path=tube100_asset_path, prim_path="/World/tube100/tube100_{}_{}".format(i,j))
+        object_prim = stage.GetPrimAtPath("/World/tube100/tube100_{}_{}".format(i,j))
+        # 添加平移：https://forums.developer.nvidia.com/t/add-and-transform-usd-assets-in-python/250701/4
+        xformable = UsdGeom.Xformable(object_prim)
+        xformable.SetXformOpOrder([])
+        translateop = xformable.AddTranslateOp()
+        translateop.Set(Gf.Vec3d(0.4+0.013 +0.016*14, 0.3+0.022+0.016*j, 0.12))
+        xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(90.0, 0.0, 0.0))
 # Set physics
 # https://docs.omniverse.nvidia.com/isaacsim/latest/how_to_guides/environment_setup.html
 # https://forums.developer.nvidia.com/t/load-meshes-into-sim/257938/2
@@ -175,10 +196,16 @@ xformable.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))
 # )
 
 # Add camera
-cameraPath = "/Camera"
+cameraPath = "/Camera/Camera1"
 camera = UsdGeom.Camera.Define(stage, cameraPath)
 camera.AddTranslateOp().Set(Gf.Vec3d(1.3, 0.35, 1.3))
 camera.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(30.0, 10.0, 95.0))
+demo_camera = cameraPath
+# Add camera2
+cameraPath = "/Camera/Camera_rack1"
+camera = UsdGeom.Camera.Define(stage, cameraPath)
+camera.AddTranslateOp().Set(Gf.Vec3d(0.5, -0.32, 1.4))
+camera.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(0., 0.0, 0.0))
 demo_camera = cameraPath
 
 # 抓取物体
