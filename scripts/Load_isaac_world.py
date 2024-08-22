@@ -1,0 +1,131 @@
+from omni.isaac.examples.base_sample import BaseSample
+from omni.isaac.core.utils.extensions import get_extension_path_from_name
+from omni.importer.urdf import _urdf
+from omni.isaac.franka.controllers import RMPFlowController
+from omni.isaac.franka.tasks import FollowTarget
+import omni.kit.commands
+import omni.usd
+# Mimic joint
+from pxr import Usd, UsdPhysics, PhysxSchema, Sdf, Gf, UsdGeom
+
+room_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/simple_room/simple_room.usd"
+omni.usd.get_context().open_stage(room_asset_path)
+# Import URDF Robot
+# https://docs.omniverse.nvidia.com/isaacsim/latest/advanced_tutorials/tutorial_advanced_import_urdf.html#importing-urdf-using-python
+urdf_interface = _urdf.acquire_urdf_interface()
+# Set the settings in the import config
+import_config = _urdf.ImportConfig()
+import_config.merge_fixed_joints = False
+import_config.convex_decomp = False
+import_config.fix_base = True
+import_config.make_default_prim = True
+import_config.self_collision = False
+import_config.create_physics_scene = True
+import_config.import_inertia_tensor = False
+import_config.default_drive_strength = 1047.19751
+import_config.default_position_drive_damping = 52.35988
+import_config.default_drive_type = _urdf.UrdfJointTargetType.JOINT_DRIVE_POSITION
+import_config.distance_scale = 1
+import_config.density = 0.0
+# Get the urdf file path
+extension_path = get_extension_path_from_name("omni.importer.urdf")
+# root_path = extension_path + "/data/urdf/robots/franka_description/robots"
+root_path = "/catkin_ws/src/ur5_robot_gripper/urdf/ur_description"
+# file_name = "panda_arm_hand.urdf"
+file_name = "ur5.urdf"
+# Finally import the robot
+result, prim_path = omni.kit.commands.execute( "URDFParseAndImportFile", urdf_path="{}/{}".format(root_path, file_name),
+                                                      import_config=import_config,)
+
+stage = omni.usd.get_context().get_stage()
+
+print(prim_path)
+
+# set mimic joints
+## /isaac-sim/extsPhysics/omni.physx.demos/omni/physxdemos/scenes/MimicJointDemo.py
+# 设置关节的路径，假设这些路径在你的URDF文件中是已知的
+left_knuckle_joint_path = prim_path + "/robotiq_85_base_link/robotiq_85_left_knuckle_joint"
+left_inner_knuckle_joint_path = prim_path + "/robotiq_85_base_link/robotiq_85_left_inner_knuckle_joint"
+print(left_knuckle_joint_path)
+print(left_inner_knuckle_joint_path)
+left_knuckle_joint_prim = stage.GetPrimAtPath(left_knuckle_joint_path)
+left_inner_knuckle_joint_prim = stage.GetPrimAtPath(left_inner_knuckle_joint_path)
+# 获取这些关节的Prim
+# 应用 mimic API 到左内侧关节
+mimic_api = PhysxSchema.PhysxMimicJointAPI.Apply(left_inner_knuckle_joint_prim.GetPrim(), UsdPhysics.Tokens.rotZ)
+
+# 设置 mimic 目标关节
+mimic_api.GetReferenceJointRel().AddTarget(left_knuckle_joint_path)
+
+# 设置齿轮比率和偏移（根据实际需求调整）
+mimic_api.GetGearingAttr().Set(-1.0)  # 1:1的齿轮比率
+mimic_api.GetOffsetAttr().Set(0.0)  # 无偏移
+
+
+# 访问assets载入桌子
+# https://forums.developer.nvidia.com/t/creating-moving-objects-using-python-scripts/280418
+from omni.isaac.core.utils.nucleus import get_assets_root_path
+assets_root_path = get_assets_root_path()
+if assets_root_path is None:
+    carb.log_error("Could not find Isaac Sim assets folder")
+    simulation_app.close()
+    sys.exit()
+print(assets_root_path)
+from omni.isaac.core.utils.stage import add_reference_to_stage
+leaf_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/tube75/tube75.usd"
+for i in range (7):
+    add_reference_to_stage(usd_path=leaf_asset_path, prim_path="/World/tube75/tube75_{}".format(i))
+    object_prim = stage.GetPrimAtPath("/World/tube75/tube75_{}".format(i))
+    # 添加平移：https://forums.developer.nvidia.com/t/add-and-transform-usd-assets-in-python/250701/4
+    xformable = UsdGeom.Xformable(object_prim)
+    xformable.SetXformOpOrder([])
+    translateop = xformable.AddTranslateOp()
+    translateop.Set(Gf.Vec3d(0.2, 0.0, 0.1*i))
+
+# Set physics
+# https://docs.omniverse.nvidia.com/isaacsim/latest/how_to_guides/environment_setup.html
+# https://forums.developer.nvidia.com/t/load-meshes-into-sim/257938/2
+# Create OG graph
+# https://docs.omniverse.nvidia.com/isaacsim/latest/ros_tutorials/tutorial_ros_manipulation.html
+# import omni.graph.core as og
+
+# load obj:
+# https://forums.developer.nvidia.com/t/how-to-conveniently-import-obj-files-via-python-scripts/204692/6
+# og.Controller.edit(
+#     {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
+#     {
+#         og.Controller.Keys.CREATE_NODES: [
+#             ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
+#             ("PublishJointState", "omni.isaac.ros_bridge.ROS1PublishJointState"),
+#             ("SubscribeJointState", "omni.isaac.ros_bridge.ROS1SubscribeJointState"),
+#             ("ArticulationController", "omni.isaac.core_nodes.IsaacArticulationController"),
+#             ("ReadSimTime", "omni.isaac.core_nodes.IsaacReadSimulationTime"),
+#         ],
+#         og.Controller.Keys.CONNECT: [
+#             ("OnPlaybackTick.outputs:tick", "PublishJointState.inputs:execIn"),
+#             ("OnPlaybackTick.outputs:tick", "SubscribeJointState.inputs:execIn"),
+#             ("OnPlaybackTick.outputs:tick", "ArticulationController.inputs:execIn"),
+
+#             ("ReadSimTime.outputs:simulationTime", "PublishJointState.inputs:timeStamp"),
+
+#             ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
+#             ("SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
+#             ("SubscribeJointState.outputs:velocityCommand", "ArticulationController.inputs:velocityCommand"),
+#             ("SubscribeJointState.outputs:effortCommand", "ArticulationController.inputs:effortCommand"),
+#         ],
+#         og.Controller.Keys.SET_VALUES: [
+#             # Providing path to /panda robot to Articulation Controller node
+#             # Providing the robot path is equivalent to setting the targetPrim in Articulation Controller node
+#             # ("ArticulationController.inputs:usePath", True),      # if you are using an older version of Isaac Sim, you may need to uncomment this line
+#             ("ArticulationController.inputs:robotPath", "/panda"),
+#             ("PublishJointState.inputs:targetPrim", "/panda"),
+#         ],
+#     },
+# )
+
+# Add camera
+# cameraPath = defaultPrimPath + "/Camera"
+#         camera = UsdGeom.Camera.Define(stage, cameraPath)
+#         camera.AddTranslateOp().Set(Gf.Vec3d(0.0, 0.2, 2))
+#         camera.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(0.0, 0.0, 0.0))
+#         self.demo_camera = cameraPath
