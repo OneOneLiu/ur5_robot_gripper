@@ -83,6 +83,7 @@ int main(int argc, char * argv[])
   );
 
   // Create and start the multi-threaded executor
+  // https://github.com/moveit/moveit/issues/1187
   rclcpp::executors::MultiThreadedExecutor executor;
   executor.add_node(node);
   std::thread executor_thread([&executor]() { executor.spin(); });
