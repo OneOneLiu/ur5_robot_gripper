@@ -110,13 +110,25 @@ xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d
 
 xformable.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))
 
-rack_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/rack/rack.usd"
-add_reference_to_stage(usd_path=rack_asset_path, prim_path="/World/rack")
-object_prim = stage.GetPrimAtPath("/World/rack")
+rack1_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/rack/rack.usd"
+add_reference_to_stage(usd_path=rack1_asset_path, prim_path="/World/rack/rack1")
+object_prim = stage.GetPrimAtPath("/World/rack/rack1")
 xformable = UsdGeom.Xformable(object_prim)
 xformable.SetXformOpOrder([])
 translateop = xformable.AddTranslateOp()
-translateop.Set(Gf.Vec3d(0.4, 0.30, 0.0))
+translateop.Set(Gf.Vec3d(0.4, 0.30, -0.002))
+
+xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(0.0, 0.0, 0.0))
+
+xformable.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))
+
+rack2_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/rack/rack.usd"
+add_reference_to_stage(usd_path=rack2_asset_path, prim_path="/World/rack/rack2")
+object_prim = stage.GetPrimAtPath("/World/rack/rack2")
+xformable = UsdGeom.Xformable(object_prim)
+xformable.SetXformOpOrder([])
+translateop = xformable.AddTranslateOp()
+translateop.Set(Gf.Vec3d(0.4, -0.38, -0.002))
 
 xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(0.0, 0.0, 0.0))
 
@@ -168,3 +180,6 @@ camera = UsdGeom.Camera.Define(stage, cameraPath)
 camera.AddTranslateOp().Set(Gf.Vec3d(1.3, 0.35, 1.3))
 camera.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(30.0, 10.0, 95.0))
 demo_camera = cameraPath
+
+# 抓取物体
+# https://forums.developer.nvidia.com/t/object-gripping-and-picking/291963/6
