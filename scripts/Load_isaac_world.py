@@ -72,16 +72,37 @@ if assets_root_path is None:
     sys.exit()
 print(assets_root_path)
 from omni.isaac.core.utils.stage import add_reference_to_stage
-leaf_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/tube75/tube75.usd"
-for i in range (7):
-    add_reference_to_stage(usd_path=leaf_asset_path, prim_path="/World/tube75/tube75_{}".format(i))
+tube75_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/tube75/tube75.usd"
+for i in range (13):
+    add_reference_to_stage(usd_path=tube75_asset_path, prim_path="/World/tube75/tube75_{}".format(i))
     object_prim = stage.GetPrimAtPath("/World/tube75/tube75_{}".format(i))
     # 添加平移：https://forums.developer.nvidia.com/t/add-and-transform-usd-assets-in-python/250701/4
     xformable = UsdGeom.Xformable(object_prim)
     xformable.SetXformOpOrder([])
     translateop = xformable.AddTranslateOp()
-    translateop.Set(Gf.Vec3d(0.2, 0.0, 0.1*i))
+    translateop.Set(Gf.Vec3d(0.5, 0.1, 0.1+0.05*i))
 
+tube100_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/tube100/tube100.usd"
+for i in range (13):
+    add_reference_to_stage(usd_path=tube100_asset_path, prim_path="/World/tube100/tube100_{}".format(i))
+    object_prim = stage.GetPrimAtPath("/World/tube100/tube100_{}".format(i))
+    # 添加平移：https://forums.developer.nvidia.com/t/add-and-transform-usd-assets-in-python/250701/4
+    xformable = UsdGeom.Xformable(object_prim)
+    xformable.SetXformOpOrder([])
+    translateop = xformable.AddTranslateOp()
+    translateop.Set(Gf.Vec3d(0.5, 0.1, 0.13+0.05*i))
+
+tray_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/tray/tray.usd"
+add_reference_to_stage(usd_path=tray_asset_path, prim_path="/World/tray")
+object_prim = stage.GetPrimAtPath("/World/tray")
+xformable = UsdGeom.Xformable(object_prim)
+xformable.SetXformOpOrder([])
+translateop = xformable.AddTranslateOp()
+translateop.Set(Gf.Vec3d(0.54, 0.015, -0.01))
+
+xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(90.0, 0.0, 0.0))
+
+xformable.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))
 # Set physics
 # https://docs.omniverse.nvidia.com/isaacsim/latest/how_to_guides/environment_setup.html
 # https://forums.developer.nvidia.com/t/load-meshes-into-sim/257938/2
