@@ -103,6 +103,18 @@ translateop.Set(Gf.Vec3d(0.54, 0.015, -0.01))
 xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(90.0, 0.0, 0.0))
 
 xformable.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))
+
+rack_asset_path = "/catkin_ws/src/ur5_robot_gripper/meshes/rack/rack.usd"
+add_reference_to_stage(usd_path=rack_asset_path, prim_path="/World/rack")
+object_prim = stage.GetPrimAtPath("/World/rack")
+xformable = UsdGeom.Xformable(object_prim)
+xformable.SetXformOpOrder([])
+translateop = xformable.AddTranslateOp()
+translateop.Set(Gf.Vec3d(0.4, 0.30, 0.0))
+
+xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(0.0, 0.0, 0.0))
+
+xformable.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))
 # Set physics
 # https://docs.omniverse.nvidia.com/isaacsim/latest/how_to_guides/environment_setup.html
 # https://forums.developer.nvidia.com/t/load-meshes-into-sim/257938/2
