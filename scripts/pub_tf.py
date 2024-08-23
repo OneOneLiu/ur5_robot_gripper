@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# 必须得有上面这一句shepang才能在终端直接运行这个python文件作为ros的node
 import math
 import numpy as np
 import rclpy
