@@ -146,15 +146,7 @@ class UIBuilder:
         On pressing the Load Button, a new instance of World() is created and then this function is called.
         The user should now load their assets onto the stage and add them to the World Scene.
         """
-        create_new_stage()
-        self._add_light_to_stage()
-
         loaded_objects = self._scenario.load_example_assets()
-
-        # Add user-loaded objects to the World
-        world = World.instance()
-        for loaded_object in loaded_objects:
-            world.scene.add(loaded_object)
 
     def _setup_scenario(self):
         """
