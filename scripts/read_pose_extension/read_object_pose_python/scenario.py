@@ -94,6 +94,11 @@ class UR_Tube_Scenario:
             self.load_usd_assets(prim_path="/World/tube100/tube100_demo_{}".format(i), usd_path=tube100_asset_path)
             self.set_object_transforms("/World/tube100/tube100_demo_{}".format(i), (0.4+0.013+0.016*14, 0.3+0.022+0.016*i, 0.12), (90.0, 0.0, 0.0), (1.0, 1.0, 1.0))
         
+        # Add camera
+        self.add_camera("/Camera/Camera1", (1.3, 0.35, 1.3), (30.0, 10.0, 95.0))
+        self.add_camera("/Camera/Camera_on_top", (0.55, 0.015, 1.35), (0.0, 0.0, 90.0))
+        self.add_camera("/Camera/Camera_rack1", (0.5, -0.32, 1.4), (0.0, 0.0, 0.0))
+        
         return None
     
     def load_usd_assets(self, prim_path = None, usd_path = None):
@@ -151,6 +156,12 @@ class UR_Tube_Scenario:
 
         # Create a script generator to execute my_script().
         self._script_generator = self.my_script()
+    
+    def add_camera(self, camera_prim_path, translation, rotation):
+        # Add camera
+        camera = UsdGeom.Camera.Define(self.stage, camera_prim_path)
+        camera.AddTranslateOp().Set(Gf.Vec3d(translation))
+        camera.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(rotation))
     
     def set_object_transforms(self, object_prim_path, translation, rotation, scale):
         '''Set the object transforms
