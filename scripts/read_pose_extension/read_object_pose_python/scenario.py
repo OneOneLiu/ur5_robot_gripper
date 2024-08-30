@@ -20,8 +20,12 @@ from omni.isaac.motion_generation import ArticulationMotionPolicy, RmpFlow
 from omni.isaac.motion_generation.interface_config_loader import load_supported_motion_policy_config
 from omni.isaac.nucleus import get_assets_root_path
 
+import omni
+from omni.importer.urdf import _urdf
+from omni.isaac.core.utils.extensions import get_extension_path_from_name
+from pxr import Usd, UsdPhysics, PhysxSchema, Sdf, Gf, UsdGeom
 
-class FrankaRmpFlowExampleScript:
+class UR_Tube_Scenario:
     def __init__(self):
         self._rmpflow = None
         self._articulation_rmpflow = None
@@ -30,6 +34,8 @@ class FrankaRmpFlowExampleScript:
         self._target = None
 
         self._script_generator = None
+        
+        self.assests_root_path = "/catkin_ws/src/ur5_robot_gripper/meshes"
 
     def load_example_assets(self):
         """Load assets onto the stage and return them so they can be registered with the
@@ -40,50 +46,90 @@ class FrankaRmpFlowExampleScript:
         The position in which things are loaded is also the position to which
         they will be returned on reset.
         """
+        # Open USD assets
+        omni.usd.get_context().open_stage("{}/simple_room/simple_room.usd".format(self.assests_root_path))
+        self.stage = omni.usd.get_context().get_stage()
+        # load URDF assets
+        results, self.robot_prim_path = self.load_urdf_assets(root_path = "/catkin_ws/src/ur5_robot_gripper/urdf/ur_description", file_name = "ur5.urdf")
+        # Set up the robot joint mimic
+        left_knuckle_joint_path = self.robot_prim_path + "/robotiq_85_base_link/robotiq_85_left_knuckle_joint"
+        left_inner_knuckle_joint_path = self.robot_prim_path + "/robotiq_85_base_link/robotiq_85_left_inner_knuckle_joint"
+        left_finger_tip_joint_path = self.robot_prim_path + "/robotiq_85_left_inner_knuckle_link/robotiq_85_left_finger_tip_joint"
 
-        robot_prim_path = "/panda"
-        path_to_robot_usd = get_assets_root_path() + "/Isaac/Robots/Franka/franka.usd"
+        self.set_mimic_joints(left_inner_knuckle_joint_path, left_knuckle_joint_path, gearing = -1.0, offset = 0.0)
+        self.set_mimic_joints(left_finger_tip_joint_path, left_knuckle_joint_path, gearing = 1.0, offset = 0.0)
+        
+        # Load Usd assets
+        ## Load the tray
+        self.load_usd_assets(prim_path="/World/tray", usd_path="{}/tray/tray.usd".format(self.assests_root_path))
+        self.set_object_transforms("/World/tray", (0.54, 0.015, -0.01), (90.0, 0.0, 0.0), (1, 1, 1))
+        
+        ## Load the tube racks
+        self.load_usd_assets(prim_path="/World/rack/rack1", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
+        self.set_object_transforms("/World/rack/rack1", (0.4, 0.30, -0.002), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+        self.load_usd_assets(prim_path="/World/rack/rack2", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
+        self.set_object_transforms("/World/rack/rack2", (0.4, -0.38, -0.002), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+        
+        ## Load the tubes
+        tube75_asset_path = "{}/tube75/tube75.usd".format(self.assests_root_path)
+        for i in range (7):
+            for j in range(2):
+                self.load_usd_assets(prim_path="/World/tube75/tube75_{}_{}".format(i,j), usd_path=tube75_asset_path)
+                rotation = (0.0, 0.0, 0.0)
+                if j:
+                    rotation= (180.0, 0.0, 0.0)
+                self.set_object_transforms("/World/tube75/tube75_{}_{}".format(i,j), (0.5 +0.1*j, 0.05+0.025*j, 0.05+0.035*i), rotation, (1.0, 1.0, 1.0))
+        
+        tube100_asset_path = "{}/tube100/tube100.usd".format(self.assests_root_path)
+        for i in range (7):
+            for j in range(2):
+                self.load_usd_assets(prim_path="/World/tube100/tube100_{}_{}".format(i,j), usd_path=tube100_asset_path)
+                self.set_object_transforms("/World/tube100/tube100_{}_{}".format(i,j), (0.5 + 0.1*j,  0.075+0.025*j, 0.1+0.035*i), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+        
+        # Load demo tubes
+        for i in range (4):
+            self.load_usd_assets(prim_path="/World/tube75/tube75_demo_{}".format(i), usd_path=tube75_asset_path)
+            self.set_object_transforms("/World/tube75/tube75_demo_{}".format(i), (0.4+0.013+0.016*14, -0.38+0.022+0.016*i, 0.12), (90.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+        for i in range (4):
+            self.load_usd_assets(prim_path="/World/tube100/tube100_demo_{}".format(i), usd_path=tube100_asset_path)
+            self.set_object_transforms("/World/tube100/tube100_demo_{}".format(i), (0.4+0.013+0.016*14, 0.3+0.022+0.016*i, 0.12), (90.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+        
+        return None
+    
+    def load_usd_assets(self, prim_path = None, usd_path = None):
+        if prim_path is None or usd_path is None:
+            raise ValueError("prim_path and usd_path must be provided")
+        else:
+            pass
+        
+        add_reference_to_stage(usd_path, prim_path)
 
-        add_reference_to_stage(path_to_robot_usd, robot_prim_path)
-        self._articulation = Articulation(robot_prim_path)
+    def load_urdf_assets(self, root_path = None, file_name = None):
+        '''Load assets from URDF file onto the stage and return them so they can be registered with the core.World.
+        '''
+        self.urdf_interface = _urdf.acquire_urdf_interface()
+        # Set the settings in the import config
+        import_config = _urdf.ImportConfig()
+        import_config.merge_fixed_joints = False
+        import_config.convex_decomp = False
+        import_config.fix_base = True
+        import_config.make_default_prim = True
+        import_config.self_collision = False
+        import_config.create_physics_scene = True
+        import_config.import_inertia_tensor = False
+        import_config.default_drive_strength = 1047.19751
+        import_config.default_position_drive_damping = 52.35988
+        import_config.default_drive_type = _urdf.UrdfJointTargetType.JOINT_DRIVE_POSITION
+        import_config.distance_scale = 1
+        import_config.density = 0.0
 
-        add_reference_to_stage(get_assets_root_path() + "/Isaac/Props/UIElements/frame_prim.usd", "/World/target")
-        self._target = XFormPrim(
-            "/World/target",
-            scale=[0.04, 0.04, 0.04],
-            position=np.array([0.4, 0, 0.25]),
-            orientation=euler_angles_to_quats([0, np.pi, 0]),
-        )
-
-        self._obstacles = [
-            FixedCuboid(
-                name="ob1",
-                prim_path="/World/obstacle_1",
-                scale=np.array([0.03, 1.0, 0.3]),
-                position=np.array([0.25, 0.25, 0.15]),
-                color=np.array([0.0, 0.0, 1.0]),
-            ),
-            FixedCuboid(
-                name="ob2",
-                prim_path="/World/obstacle_2",
-                scale=np.array([0.5, 0.03, 0.3]),
-                position=np.array([0.5, 0.25, 0.15]),
-                color=np.array([0.0, 0.0, 1.0]),
-            ),
-        ]
-
-        self._goal_block = DynamicCuboid(
-            name="Cube",
-            position=np.array([0.4, 0, 0.025]),
-            prim_path="/World/pick_cube",
-            size=0.05,
-            color=np.array([1, 0, 0]),
-        )
-        self._ground_plane = GroundPlane("/World/Ground")
-
-        # Return assets that were added to the stage so that they can be registered with the core.World
-        return self._articulation, self._target, *self._obstacles, self._goal_block, self._ground_plane
-
+        # Get the urdf file path
+        extension_path = get_extension_path_from_name("omni.importer.urdf")
+        # Finally import the robot
+        result, prim_path = omni.kit.commands.execute( "URDFParseAndImportFile", urdf_path="{}/{}".format(root_path, file_name),
+                                                            import_config=import_config,)
+        return result, prim_path
+    
     def setup(self):
         """
         This function is called after assets have been loaded from ui_builder._setup_scenario().
@@ -105,7 +151,35 @@ class FrankaRmpFlowExampleScript:
 
         # Create a script generator to execute my_script().
         self._script_generator = self.my_script()
+    
+    def set_object_transforms(self, object_prim_path, translation, rotation, scale):
+        '''Set the object transforms
+        Args:
+            object_prim_path (str): The path to the object prim
+            translation (list): The translation values (mm)
+            rotation (list): The rotation values (degree)
+            scale (list): The scale values
+        '''
+        # TODO: Check if this is the elegant way to set the object transforms, if not, refactor the code. Becuase this method seems to transform the object into an Xformable object
+        object_prim = self.stage.GetPrimAtPath(object_prim_path)
+        xformable = UsdGeom.Xformable(object_prim)
+        xformable.SetXformOpOrder([])
+        translateop = xformable.AddTranslateOp()
+        translateop.Set(Gf.Vec3d(translation))
 
+        xformable.AddRotateXYZOp(precision=UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(rotation))
+
+        xformable.AddScaleOp().Set(Gf.Vec3f(scale))
+    
+    def set_mimic_joints(self, mimic_joint_path, target_joint_path, gearing = 1.0, offset = 0.0):
+        mimic_joint_prim = self.stage.GetPrimAtPath(mimic_joint_path)
+        mimic_api = PhysxSchema.PhysxMimicJointAPI.Apply(mimic_joint_prim.GetPrim(), UsdPhysics.Tokens.rotZ)
+        mimic_api.GetReferenceJointRel().AddTarget(target_joint_path)
+        
+        # 设置齿轮比率和偏移（根据实际需求调整）
+        mimic_api.GetGearingAttr().Set(gearing)
+        mimic_api.GetOffsetAttr().Set(offset)
+    
     def reset(self):
         """
         This function is called when the reset button is pressed.
