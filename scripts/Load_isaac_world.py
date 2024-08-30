@@ -187,21 +187,40 @@ og.Controller.edit(
             ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
             ("SubscribeJointState", "omni.isaac.ros2_bridge.ROS2SubscribeJointState"),
             ("ArticulationController", "omni.isaac.core_nodes.IsaacArticulationController"),
+            # For reading prim attributes
+            ("ReadPrimAttribute", "omni.graph.nodes.ReadPrimAttribute"),
+            ("BreakVector3", "omni.graph.nodes.BreakVector3"),
+            ("ROS2Publisher", "omni.isaac.ros2_bridge.ROS2Publisher"),
         ],
         og.Controller.Keys.CONNECT: [
             ("OnPlaybackTick.outputs:tick", "ArticulationController.inputs:execIn"),
             ("OnPlaybackTick.outputs:tick", "SubscribeJointState.inputs:execIn"),
-
-
             ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
             ("SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
             ("SubscribeJointState.outputs:velocityCommand", "ArticulationController.inputs:velocityCommand"),
             ("SubscribeJointState.outputs:effortCommand", "ArticulationController.inputs:effortCommand"),
+            
+            # For reading prim attributes
+            ("OnPlaybackTick.outputs:time", "ReadPrimAttribute.inputs:usdTimecode"),
+            ("OnPlaybackTick.outputs:tick", "ROS2Publisher.inputs:execIn"),
+            ("ReadPrimAttribute.outputs:value", "BreakVector3.inputs:tuple"),
+            ("BreakVector3.outputs:x", "ROS2Publisher.inputs:position:x"),
+            ("BreakVector3.outputs:y", "ROS2Publisher.inputs:position:y"),
+            ("BreakVector3.outputs:z", "ROS2Publisher.inputs:position:z"),
         ],
         og.Controller.Keys.SET_VALUES: [
             ("ArticulationController.inputs:robotPath", "/ur5_with_robotiq_2f_85"),
             ("ArticulationController.inputs:targetPrim", "/ur5_with_robotiq_2f_85"),
             ("SubscribeJointState.inputs:topicName", "/joint_states"),
+            
+            # For reading prim attributes
+            ("ReadPrimAttribute.inputs:name", "xformOp:translate"),
+            ("ReadPrimAttribute.inputs:primPath", "/World/tube75/tube75_0_0/tube75"),
+            ("ReadPrimAttribute.inputs:usePath", True),
+            
+            ("ROS2Publisher.inputs:messageName", "Pose"),
+            ("ROS2Publisher.inputs:messagePackage", "geometry_msgs"),
+            ("ROS2Publisher.inputs:topicName", "object_pose"),
         ],
     },
 )
