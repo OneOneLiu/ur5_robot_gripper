@@ -163,7 +163,10 @@ class UR_Tube_Scenario:
     
     def setup_physics(self):
         # https://docs.omniverse.nvidia.com/isaacsim/latest/how_to_guides/environment_setup.html
-        physxSceneAPI = PhysxSchema.PhysxSceneAPI.Get(self.stage, "/World/physicsScene")
+        # PhysxSchema.PhysxSceneAPI.Apply(stage.GetPrimAtPath("/World/physicsScene")) # Use this prim path will cause error, I don't understand why
+        # physxSceneAPI = PhysxSchema.PhysxSceneAPI.Get(stage, "/World/physicsScene")
+        PhysxSchema.PhysxSceneAPI.Apply(self.stage.GetPrimAtPath("/World"))
+        physxSceneAPI = PhysxSchema.PhysxSceneAPI.Get(self.stage, "/World")
         physxSceneAPI.CreateEnableCCDAttr(True)
         physxSceneAPI.CreateEnableStabilizationAttr(True)
         physxSceneAPI.CreateEnableGPUDynamicsAttr(True)
