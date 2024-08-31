@@ -238,17 +238,19 @@ class UR_Tube_Scenario:
             return True
 
     def my_script(self):
-        self.dc = _dynamic_control.acquire_dynamic_control_interface()
-        obj = self.dc.get_rigid_body("/World/tube75/tube75_0_0/tube75/tube75")
         prim_path = "/World/tube75/tube75_0_0/tube75/tube75"
-        target = XFormPrim(prim_path)
+        target = XFormPrim(prim_path) # BUG：用这种方式获取姿态的话目标的仿真就会出现问题，就不坠落了
 
         # 然后你可以使用 get_world_pose()
         while True:  # 无限循环
-            # pose = self.dc.get_rigid_body_pose(obj)
-            translation, orientation = target.get_world_pose()
-            print(f"Translation: {translation}, Orientation: {orientation}")
-            # print(pose)
+            for i in range(7):  # i 的范围是 0 到 6
+                for j in range(2):  # j 的范围是 0 到 1
+                    prim_path = f"/World/tube75/tube75_{i}_{j}/tube75/tube75"
+                    target = XFormPrim(prim_path)
+                    
+                    # 获取并打印每个试管的姿态
+                    translation, orientation = target.get_world_pose()
+                    print(f"Tube {i}_{j} -> Translation: {translation}, Orientation: {orientation}")
             yield  # 在每个仿真步骤中暂停执行，等待下一步
 
         # # Notice that subroutines can still use return statements to exit.  goto_position() returns a boolean to indicate success.
