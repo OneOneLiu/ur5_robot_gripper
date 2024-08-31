@@ -101,6 +101,8 @@ class UR_Tube_Scenario:
         self.add_camera("/Camera/Camera_rack1", (0.5, -0.32, 1.4), (0.0, 0.0, 0.0))
         
         # TODO: enable gpu dynamics
+        self.setup_physics()
+        
         return None
     
     def load_usd_assets(self, prim_path = None, usd_path = None):
@@ -158,6 +160,15 @@ class UR_Tube_Scenario:
 
         # Create a script generator to execute my_script().
         self._script_generator = self.my_script()
+    
+    def setup_physics(self):
+        # https://docs.omniverse.nvidia.com/isaacsim/latest/how_to_guides/environment_setup.html
+        physxSceneAPI = PhysxSchema.PhysxSceneAPI.Get(self.stage, "/World/physicsScene")
+        physxSceneAPI.CreateEnableCCDAttr(True)
+        physxSceneAPI.CreateEnableStabilizationAttr(True)
+        physxSceneAPI.CreateEnableGPUDynamicsAttr(True)
+        physxSceneAPI.CreateBroadphaseTypeAttr("GPU")
+        physxSceneAPI.CreateSolverTypeAttr("TGS")
     
     def add_camera(self, camera_prim_path, translation, rotation):
         # Add camera
