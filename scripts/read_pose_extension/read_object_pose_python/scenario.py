@@ -78,14 +78,14 @@ class UR_Tube_Scenario:
                 self.load_usd_assets(prim_path="/World/tube75/tube75_{}_{}".format(i,j), usd_path=tube75_asset_path)
                 rotation = (0.0, 0.0, 0.0)
                 if j:
-                    rotation= (180.0, 0.0, 0.0)
+                    rotation= (0.0, 0.0, 180.0)
                 self.set_object_transforms("/World/tube75/tube75_{}_{}".format(i,j), (0.5 +0.1*j, 0.05+0.025*j, 0.05+0.035*i), rotation, (1.0, 1.0, 1.0))
         
         tube100_asset_path = "{}/tube100/tube100.usd".format(self.assests_root_path)
         for i in range (7):
             for j in range(2):
                 self.load_usd_assets(prim_path="/World/tube100/tube100_{}_{}".format(i,j), usd_path=tube100_asset_path)
-                self.set_object_transforms("/World/tube100/tube100_{}_{}".format(i,j), (0.5 + 0.1*j,  0.075+0.025*j, 0.1+0.035*i), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+                self.set_object_transforms("/World/tube100/tube100_{}_{}".format(i,j), (0.52 + 0.1*j,  0.05+0.025*j, 0.05+0.035*i), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
         
         # Load demo tubes
         for i in range (4):
@@ -238,21 +238,20 @@ class UR_Tube_Scenario:
             return True
 
     def my_script(self):
-        prim_path = "/World/tube75/tube75_0_0/tube75/tube75"
-        target = XFormPrim(prim_path) # BUG：用这种方式获取姿态的话目标的仿真就会出现问题，就不坠落了
 
+        self.dc = _dynamic_control.acquire_dynamic_control_interface()
         # 然后你可以使用 get_world_pose()
         while True:  # 无限循环
             for i in range(7):  # i 的范围是 0 到 6
                 for j in range(2):  # j 的范围是 0 到 1
                     prim_path = f"/World/tube75/tube75_{i}_{j}/tube75/tube75"
-                    target = XFormPrim(prim_path)
-                    
-                    # 获取并打印每个试管的姿态
-                    translation, orientation = target.get_world_pose()
+                    obj = self.dc.get_rigid_body(prim_path)
+                    pose = self.dc.get_rigid_body_pose(obj)
+                    translation = [pose.p.x, pose.p.y, pose.p.z]
+                    orientation = [pose.r.x, pose.r.y, pose.r.z, pose.r.w]
                     print(f"Tube {i}_{j} -> Translation: {translation}, Orientation: {orientation}")
+            
             yield  # 在每个仿真步骤中暂停执行，等待下一步
-
         # # Notice that subroutines can still use return statements to exit.  goto_position() returns a boolean to indicate success.
         # success = yield from self.goto_position(
         #     translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
