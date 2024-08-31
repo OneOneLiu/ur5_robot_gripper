@@ -24,6 +24,7 @@ import omni
 from omni.importer.urdf import _urdf
 from omni.isaac.core.utils.extensions import get_extension_path_from_name
 from pxr import Usd, UsdPhysics, PhysxSchema, Sdf, Gf, UsdGeom
+from omni.isaac.dynamic_control import _dynamic_control
 
 class UR_Tube_Scenario:
     def __init__(self):
@@ -99,6 +100,7 @@ class UR_Tube_Scenario:
         self.add_camera("/Camera/Camera_on_top", (0.55, 0.015, 1.35), (0.0, 0.0, 90.0))
         self.add_camera("/Camera/Camera_rack1", (0.5, -0.32, 1.4), (0.0, 0.0, 0.0))
         
+        # TODO: enable gpu dynamics
         return None
     
     def load_usd_assets(self, prim_path = None, usd_path = None):
@@ -140,19 +142,19 @@ class UR_Tube_Scenario:
         This function is called after assets have been loaded from ui_builder._setup_scenario().
         """
         # Set a camera view that looks good
-        set_camera_view(eye=[2, 0.8, 1], target=[0, 0, 0], camera_prim_path="/OmniverseKit_Persp")
+        # set_camera_view(eye=[2, 0.8, 1], target=[0, 0, 0], camera_prim_path="/OmniverseKit_Persp")
 
         # Loading RMPflow can be done quickly for supported robots
         rmp_config = load_supported_motion_policy_config("Franka", "RMPflow")
 
         # Initialize an RmpFlow object
-        self._rmpflow = RmpFlow(**rmp_config)
+        # self._rmpflow = RmpFlow(**rmp_config)
 
-        for obstacle in self._obstacles:
-            self._rmpflow.add_obstacle(obstacle)
+        # for obstacle in self._obstacles:
+        #     self._rmpflow.add_obstacle(obstacle)
 
         # Use the ArticulationMotionPolicy wrapper object to connect rmpflow to the Franka robot articulation.
-        self._articulation_rmpflow = ArticulationMotionPolicy(self._articulation, self._rmpflow)
+        # self._articulation_rmpflow = ArticulationMotionPolicy(self._articulation, self._rmpflow)
 
         # Create a script generator to execute my_script().
         self._script_generator = self.my_script()
@@ -222,53 +224,62 @@ class UR_Tube_Scenario:
             return True
 
     def my_script(self):
-        translation_target, orientation_target = self._target.get_world_pose()
+        self.dc = _dynamic_control.acquire_dynamic_control_interface()
+        obj = self.dc.get_rigid_body("/World/tube75/tube75_0_0/tube75/tube75")
+        prim_path = "/World/tube75/tube75_0_0/tube75/tube75"
+        target = XFormPrim(prim_path)
 
-        yield from self.close_gripper_franka(self._articulation)
+        # 然后你可以使用 get_world_pose()
+        while True:  # 无限循环
+            # pose = self.dc.get_rigid_body_pose(obj)
+            translation, orientation = target.get_world_pose()
+            print(f"Translation: {translation}, Orientation: {orientation}")
+            # print(pose)
+            yield  # 在每个仿真步骤中暂停执行，等待下一步
 
-        # Notice that subroutines can still use return statements to exit.  goto_position() returns a boolean to indicate success.
-        success = yield from self.goto_position(
-            translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
-        )
+        # # Notice that subroutines can still use return statements to exit.  goto_position() returns a boolean to indicate success.
+        # success = yield from self.goto_position(
+        #     translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
+        # )
 
-        if not success:
-            print("Could not reach target position")
-            return
+        # if not success:
+        #     print("Could not reach target position")
+        #     return
 
-        yield from self.open_gripper_franka(self._articulation)
+        # yield from self.open_gripper_franka(self._articulation)
 
-        # Visualize the new target.
-        lower_translation_target = np.array([0.4, 0, 0.04])
-        self._target.set_world_pose(lower_translation_target, orientation_target)
+        # # Visualize the new target.
+        # lower_translation_target = np.array([0.4, 0, 0.04])
+        # self._target.set_world_pose(lower_translation_target, orientation_target)
 
-        success = yield from self.goto_position(
-            lower_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=250
-        )
+        # success = yield from self.goto_position(
+        #     lower_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=250
+        # )
 
-        yield from self.close_gripper_franka(self._articulation, close_position=np.array([0.02, 0.02]), atol=0.006)
+        # yield from self.close_gripper_franka(self._articulation, close_position=np.array([0.02, 0.02]), atol=0.006)
 
-        high_translation_target = np.array([0.4, 0, 0.4])
-        self._target.set_world_pose(high_translation_target, orientation_target)
+        # high_translation_target = np.array([0.4, 0, 0.4])
+        # self._target.set_world_pose(high_translation_target, orientation_target)
 
-        success = yield from self.goto_position(
-            high_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
-        )
+        # success = yield from self.goto_position(
+        #     high_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
+        # )
 
-        next_translation_target = np.array([0.4, 0.4, 0.4])
-        self._target.set_world_pose(next_translation_target, orientation_target)
+        # next_translation_target = np.array([0.4, 0.4, 0.4])
+        # self._target.set_world_pose(next_translation_target, orientation_target)
 
-        success = yield from self.goto_position(
-            next_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
-        )
+        # success = yield from self.goto_position(
+        #     next_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
+        # )
 
-        next_translation_target = np.array([0.4, 0.4, 0.25])
-        self._target.set_world_pose(next_translation_target, orientation_target)
+        # next_translation_target = np.array([0.4, 0.4, 0.25])
+        # self._target.set_world_pose(next_translation_target, orientation_target)
 
-        success = yield from self.goto_position(
-            next_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
-        )
+        # success = yield from self.goto_position(
+        #     next_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
+        # )
 
-        yield from self.open_gripper_franka(self._articulation)
+        # yield from self.open_gripper_franka(self._articulation)
 
     ################################### Functions
 
