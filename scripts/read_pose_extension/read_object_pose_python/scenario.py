@@ -26,6 +26,13 @@ from omni.isaac.core.utils.extensions import get_extension_path_from_name
 from pxr import Usd, UsdPhysics, PhysxSchema, Sdf, Gf, UsdGeom
 from omni.isaac.dynamic_control import _dynamic_control
 
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import PoseArray, Pose
+from std_msgs.msg import String, Header
+from ur5_robot_gripper.msg import StringArray
+import threading
+
 class UR_Tube_Scenario:
     def __init__(self):
         self._rmpflow = None
@@ -37,6 +44,24 @@ class UR_Tube_Scenario:
         self._script_generator = None
         
         self.assests_root_path = "/catkin_ws/src/ur5_robot_gripper/meshes"
+        
+        ## ROS2 Publisher
+        # Iinit the ROS2 node
+        if not rclpy.ok():
+            print("ROS2 is not ok")
+            rclpy.init(args=None)
+        # # Create the node
+        self.node = Node('tube_poses_publisher')
+        
+        # # Create the publisher
+        self.pose_75_array_pub = self.node.create_publisher(PoseArray, '/tube75_poses', 10)
+        self.pose_100_array_pub = self.node.create_publisher(PoseArray, '/tube100_poses', 10)
+        self.id_array_pub = self.node.create_publisher(StringArray, '/tube_ids', 10)
+
+        # # Create the rate
+        self.rate = self.node.create_rate(30)  # 10 Hz
+        self._stop_thread = False
+        self.pub_thread = threading.Thread(target=self.pub_tube_poses)
 
     def load_example_assets(self):
         """Load assets onto the stage and return them so they can be registered with the
@@ -238,65 +263,58 @@ class UR_Tube_Scenario:
             return True
 
     def my_script(self):
-
         self.dc = _dynamic_control.acquire_dynamic_control_interface()
         # 然后你可以使用 get_world_pose()
         while True:  # 无限循环
-            for i in range(7):  # i 的范围是 0 到 6
-                for j in range(2):  # j 的范围是 0 到 1
-                    prim_path = f"/World/tube75/tube75_{i}_{j}/tube75/tube75"
-                    obj = self.dc.get_rigid_body(prim_path)
-                    pose = self.dc.get_rigid_body_pose(obj)
-                    translation = [pose.p.x, pose.p.y, pose.p.z]
-                    orientation = [pose.r.x, pose.r.y, pose.r.z, pose.r.w]
-                    print(f"Tube {i}_{j} -> Translation: {translation}, Orientation: {orientation}")
-            
+            self.pub_tube_poses()
+
             yield  # 在每个仿真步骤中暂停执行，等待下一步
-        # # Notice that subroutines can still use return statements to exit.  goto_position() returns a boolean to indicate success.
-        # success = yield from self.goto_position(
-        #     translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
-        # )
-
-        # if not success:
-        #     print("Could not reach target position")
-        #     return
-
-        # yield from self.open_gripper_franka(self._articulation)
-
-        # # Visualize the new target.
-        # lower_translation_target = np.array([0.4, 0, 0.04])
-        # self._target.set_world_pose(lower_translation_target, orientation_target)
-
-        # success = yield from self.goto_position(
-        #     lower_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=250
-        # )
-
-        # yield from self.close_gripper_franka(self._articulation, close_position=np.array([0.02, 0.02]), atol=0.006)
-
-        # high_translation_target = np.array([0.4, 0, 0.4])
-        # self._target.set_world_pose(high_translation_target, orientation_target)
-
-        # success = yield from self.goto_position(
-        #     high_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
-        # )
-
-        # next_translation_target = np.array([0.4, 0.4, 0.4])
-        # self._target.set_world_pose(next_translation_target, orientation_target)
-
-        # success = yield from self.goto_position(
-        #     next_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
-        # )
-
-        # next_translation_target = np.array([0.4, 0.4, 0.25])
-        # self._target.set_world_pose(next_translation_target, orientation_target)
-
-        # success = yield from self.goto_position(
-        #     next_translation_target, orientation_target, self._articulation, self._rmpflow, timeout=200
-        # )
-
-        # yield from self.open_gripper_franka(self._articulation)
 
     ################################### Functions
+    
+    def get_object_pose(self, prim_path, output = False):
+        obj = self.dc.get_rigid_body(prim_path)
+        pose = self.dc.get_rigid_body_pose(obj)
+        translation = [pose.p.x, pose.p.y, pose.p.z]
+        orientation = [pose.r.x, pose.r.y, pose.r.z, pose.r.w]
+        
+        if output:
+            print(f"{prim_path} -> Translation: {translation}, Orientation: {orientation}")
+        
+        return translation, orientation
+
+    def pub_tube_poses(self, horizon = 7, vertical = 2):
+        print("Published ids")
+        poses_75 = PoseArray()
+        poses_100 = []
+        ids = []
+        for i in range(horizon):
+            for j in range(vertical):
+                # tube75
+                prim_path_75 = f"/World/tube75/tube75_{i}_{j}/tube75/tube75"
+                translation_75, orientation_75 = self.get_object_pose(prim_path_75, output = True)
+                pose = Pose()
+                pose.position.x = translation_75[0]
+                pose.position.y = translation_75[1]
+                pose.position.z = translation_75[2]
+                pose.orientation.x = orientation_75[0]
+                pose.orientation.y = orientation_75[1]
+                pose.orientation.z = orientation_75[2]
+                pose.orientation.w = orientation_75[3]
+                poses_75.poses.append(pose)
+                # tube100
+                # prim_path_100 = f"/World/tube100/tube100_{i}_{j}/tube100/tube100"
+                # translation_100, orientation_100 = self.get_object_pose(prim_path_100, output = True)
+                # poses_100.append({'translation': translation_100, 'orientation': orientation_100})
+                ids.append(f"tube75_{i}_{j}")
+        msg = StringArray()
+        msg.data = ids  # 将列表 ids 赋值给 StringArray 消息的 data 字段
+        
+        # # 发布 StringArray 消息
+        self.id_array_pub.publish(msg)
+        self.pose_75_array_pub.publish(poses_75)
+        # self.rate.sleep()
+        print("Published ids")
 
     def goto_position(
         self,
