@@ -19,7 +19,7 @@ from omni.usd import StageEventType
 from pxr import Sdf, UsdLux
 
 from .scenario import UR_Tube_Scenario
-
+import rclpy
 
 class UIBuilder:
     def __init__(self):
@@ -85,6 +85,10 @@ class UIBuilder:
         """
         for ui_elem in self.wrapped_ui_elements:
             ui_elem.cleanup()
+        # Cleanup ROS2 node
+        if rclpy.ok():
+            print("Shutting down ROS2 node")
+            rclpy.shutdown()
 
     def build_ui(self):
         """
