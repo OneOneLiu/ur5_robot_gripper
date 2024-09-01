@@ -21,6 +21,12 @@ ament_target_dependencies(
   "moveit_ros_planning_interface"
 )
 
+find_package(rosidl_default_generators REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/StringArray.msg"
+)
+
 install(TARGETS robot_control
   DESTINATION lib/${PROJECT_NAME})
 
