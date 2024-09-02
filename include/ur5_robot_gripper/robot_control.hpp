@@ -21,6 +21,13 @@ public:
     // Method to print the current pose of the robot
     void printCurrentPose();
 
+    // New method to move in a Cartesian path to a specified pose
+    void moveInCartesianPathToPose(double px, double py, double pz, double qx, double qy, double qz, double qw);
+    // Method to move in a Cartesian path
+    void moveInCartesianPath(const std::vector<geometry_msgs::msg::Pose>& waypoints);
+    // Method to move to a Cartesian position
+    void moveToCartesianPosition(double px, double py, double pz);
+
 private:
     // Helper method to execute a motion plan
     void executePlan();

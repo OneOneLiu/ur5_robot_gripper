@@ -24,6 +24,7 @@ int main(int argc, char * argv[])
   std::cout << "1: Move to a specified pose (position and orientation)\n";
   std::cout << "2: Move to a position while maintaining the current orientation\n";
   std::cout << "3: Print the current pose\n";
+  std::cout << "4: Move in Cartesian path to a specified pose (position and orientation)\n"; // 新增选项
   int choice;
   std::cin >> choice;
 
@@ -48,6 +49,14 @@ int main(int argc, char * argv[])
   } else if (choice == 3) {
     // 打印当前的姿态
     robot_mover.printCurrentPose();
+  } else if (choice == 4) {
+    // 获取用户输入的目标位置和姿态
+    double px, py, pz, qx, qy, qz, qw;
+    std::cout << "Enter position (x, y, z): ";
+    std::cin >> px >> py >> pz;
+
+    // 使用笛卡尔路径移动到指定位置和姿态
+    robot_mover.moveToCartesianPosition(px, py, pz);
   } else {
     std::cout << "Invalid choice. Exiting.\n";
   }
