@@ -46,8 +46,8 @@ class BaseToVirtualLinkPublisher(Node):
 
         # Set the transform header
         t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'isaac_world'  # Parent frame
-        t.child_frame_id = 'base_link'     # Child frame
+        t.header.frame_id = 'world'  # Parent frame
+        t.child_frame_id = 'isaac_world'     # Child frame
 
         # Set the translation (assuming no translation, only rotation)
         t.transform.translation.x = 0.0
@@ -55,7 +55,7 @@ class BaseToVirtualLinkPublisher(Node):
         t.transform.translation.z = 0.0
 
         # Set the rotation (around the Z axis)
-        theta = math.radians(90)  # Example: 45 degrees rotation around Z axis
+        theta = math.radians(-90)
         q = quaternion_from_euler(0, 0, theta)
         t.transform.rotation.x = q[0]
         t.transform.rotation.y = q[1]
