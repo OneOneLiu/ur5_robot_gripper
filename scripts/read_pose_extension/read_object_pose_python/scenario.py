@@ -32,6 +32,7 @@ from geometry_msgs.msg import PoseArray, Pose
 from std_msgs.msg import String, Header
 from ur5_robot_gripper.msg import StringArray
 import threading
+import omni.graph.core as og
 
 class UR_Tube_Scenario:
     def __init__(self):
@@ -127,6 +128,7 @@ class UR_Tube_Scenario:
         
         # TODO: enable gpu dynamics
         self.setup_physics()
+        self.set_omnigraph()
         
         return None
     
@@ -284,7 +286,7 @@ class UR_Tube_Scenario:
         return translation, orientation
 
     def pub_tube_poses(self, horizon = 7, vertical = 2):
-        print("Published ids")
+        # print("Published ids")
         poses_75 = PoseArray()
         poses_100 = []
         ids = []
@@ -292,7 +294,7 @@ class UR_Tube_Scenario:
             for j in range(vertical):
                 # tube75
                 prim_path_75 = f"/World/tube75/tube75_{i}_{j}/tube75/tube75"
-                translation_75, orientation_75 = self.get_object_pose(prim_path_75, output = True)
+                translation_75, orientation_75 = self.get_object_pose(prim_path_75, output = False)
                 pose = Pose()
                 pose.position.x = translation_75[0]
                 pose.position.y = translation_75[1]
@@ -314,7 +316,32 @@ class UR_Tube_Scenario:
         self.id_array_pub.publish(msg)
         self.pose_75_array_pub.publish(poses_75)
         # self.rate.sleep()
-        print("Published ids")
+        # print("Published ids")
+    
+    def set_omnigraph(self):
+        og.Controller.edit(
+            {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
+            {
+                og.Controller.Keys.CREATE_NODES: [
+                    ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
+                    ("SubscribeJointState", "omni.isaac.ros2_bridge.ROS2SubscribeJointState"),
+                    ("ArticulationController", "omni.isaac.core_nodes.IsaacArticulationController"),
+                ],
+                og.Controller.Keys.CONNECT: [
+                    ("OnPlaybackTick.outputs:tick", "ArticulationController.inputs:execIn"),
+                    ("OnPlaybackTick.outputs:tick", "SubscribeJointState.inputs:execIn"),
+                    ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
+                    ("SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
+                    ("SubscribeJointState.outputs:velocityCommand", "ArticulationController.inputs:velocityCommand"),
+                    ("SubscribeJointState.outputs:effortCommand", "ArticulationController.inputs:effortCommand"),
+                ],
+                og.Controller.Keys.SET_VALUES: [
+                    ("ArticulationController.inputs:robotPath", "/ur5_with_robotiq_2f_85"),
+                    ("ArticulationController.inputs:targetPrim", "/ur5_with_robotiq_2f_85"),
+                    ("SubscribeJointState.inputs:topicName", "/joint_states"),
+                ],
+            },
+        )
 
     def goto_position(
         self,
