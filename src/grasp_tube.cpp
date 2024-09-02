@@ -1,6 +1,7 @@
 #include "ur5_robot_gripper/robot_control.hpp"
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
+#include <thread>
 
 class PoseSubscriber : public rclcpp::Node
 {
@@ -17,33 +18,40 @@ public:
 private:
     void poseCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
     {
-        if (msg->poses.size() < 10) {
-            RCLCPP_WARN(this->get_logger(), "Received PoseArray has less than 10 poses.");
+        // 如果姿态数组小于14，记录警告信息
+        if (msg->poses.size() < 14) {
+            RCLCPP_WARN(this->get_logger(), "Received PoseArray has less than 14 poses.");
             return;
         }
 
-        // 获取第 10 个姿态
-        auto target_pose = msg->poses[9];
+        // 循环遍历从第1到第14个姿态
+        for (int i = 0; i < 14; ++i) {
+            auto target_pose = msg->poses[i];
 
-        // 调用 RobotMover 类的 moveToPosition 方法移动到目标位置
-        RCLCPP_INFO(this->get_logger(), "Moving to the 10th pose...");
-        // 打印第 10 个姿态的位置和方向
-        RCLCPP_INFO(this->get_logger(), "10th Pose Position: x=%.3f, y=%.3f, z=%.3f", 
-                    target_pose.position.x, 
-                    target_pose.position.y, 
-                    target_pose.position.z);
-        RCLCPP_INFO(this->get_logger(), "10th Pose Orientation: x=%.3f, y=%.3f, z=%.3f, w=%.3f", 
-                    target_pose.orientation.x, 
-                    target_pose.orientation.y, 
-                    target_pose.orientation.z, 
-                    target_pose.orientation.w);
-        // TODO: 写一个TF转换方法，现在这个目标位置是手动调整的
-        // 写一个笛卡尔坐标系移动方法，现在这样移动姿态有些扭曲
-        // robot_mover_.moveToCartesianPosition(
-        //     target_pose.position.y,
-        //     -target_pose.position.x,
-        //     target_pose.position.z + 0.2
-        // );
+            // 打印目标姿态的位置和方向
+            RCLCPP_INFO(this->get_logger(), "Moving to pose %d...", i + 1);
+            RCLCPP_INFO(this->get_logger(), "Pose %d Position: x=%.3f, y=%.3f, z=%.3f", 
+                        i + 1,
+                        target_pose.position.x, 
+                        target_pose.position.y, 
+                        target_pose.position.z);
+            RCLCPP_INFO(this->get_logger(), "Pose %d Orientation: x=%.3f, y=%.3f, z=%.3f, w=%.3f", 
+                        i + 1,
+                        target_pose.orientation.x, 
+                        target_pose.orientation.y, 
+                        target_pose.orientation.z, 
+                        target_pose.orientation.w);
+
+            // 使用笛卡尔路径移动到指定位置
+            robot_mover_.moveToCartesianPosition(
+                target_pose.position.y,
+                -target_pose.position.x,
+                target_pose.position.z + 0.05
+            );
+
+            // 可以选择在每次移动后进行一个小的延时，以确保运动稳定
+            rclcpp::sleep_for(std::chrono::seconds(2)); // 根据需要调整时间
+        }
     }
 
     rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr subscription_;
@@ -52,17 +60,28 @@ private:
 
 int main(int argc, char * argv[])
 {
+    // Initialize ROS and create the Node
     rclcpp::init(argc, argv);
+    auto const node = std::make_shared<rclcpp::Node>(
+        "robot_moveit",
+        rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true)
+    );
 
-    // 创建节点并开始订阅
-    auto node = std::make_shared<rclcpp::Node>("robot_moveit");
+    // 创建并启动多线程执行器
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(node);
+
+    // 创建 PoseSubscriber 实例
     auto subscriber_node = std::make_shared<PoseSubscriber>(node);
-    RobotMover robot_mover(node);
-    robot_mover.moveToCartesianPosition(0.08, -0.58, 0.3);
-    // 运行节点，直到被手动停止
-    rclcpp::spin(subscriber_node);
+    executor.add_node(subscriber_node);
 
-    // 释放节点资源，确保没有未完成的任务
+    // 在单独的线程中启动执行器
+    std::thread executor_thread([&executor]() { executor.spin(); });
+
+    // 等待执行器线程结束
+    executor_thread.join();
+
+    // Shutdown ROS
     rclcpp::shutdown();
 
     return 0;
