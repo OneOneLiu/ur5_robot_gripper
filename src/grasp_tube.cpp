@@ -8,6 +8,7 @@ public:
     PoseSubscriber(const rclcpp::Node::SharedPtr& node)
     : Node("pose_subscriber"), robot_mover_(node)
     {
+        rclcpp::sleep_for(std::chrono::seconds(1));
         // 订阅 /tube75_poses 话题
         subscription_ = this->create_subscription<geometry_msgs::msg::PoseArray>(
             "/tube75_poses", 10, std::bind(&PoseSubscriber::poseCallback, this, std::placeholders::_1));
@@ -38,11 +39,11 @@ private:
                     target_pose.orientation.w);
         // TODO: 写一个TF转换方法，现在这个目标位置是手动调整的
         // 写一个笛卡尔坐标系移动方法，现在这样移动姿态有些扭曲
-        robot_mover_.moveToPosition(
-            target_pose.position.y,
-            -target_pose.position.x,
-            target_pose.position.z + 0.2
-        );
+        // robot_mover_.moveToCartesianPosition(
+        //     target_pose.position.y,
+        //     -target_pose.position.x,
+        //     target_pose.position.z + 0.2
+        // );
     }
 
     rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr subscription_;
@@ -56,7 +57,8 @@ int main(int argc, char * argv[])
     // 创建节点并开始订阅
     auto node = std::make_shared<rclcpp::Node>("robot_moveit");
     auto subscriber_node = std::make_shared<PoseSubscriber>(node);
-
+    RobotMover robot_mover(node);
+    robot_mover.moveToCartesianPosition(0.08, -0.58, 0.3);
     // 运行节点，直到被手动停止
     rclcpp::spin(subscriber_node);
 
