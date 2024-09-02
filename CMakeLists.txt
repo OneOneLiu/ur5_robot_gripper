@@ -10,16 +10,32 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-add_executable(robot_control src/robot_control.cpp)
+
+# Build a robot_control c++ library
+add_library(robot_control STATIC src/robot_control.cpp)
 target_include_directories(robot_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(robot_control PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(robot_control PUBLIC cxx_std_17)  # Require C++17
 ament_target_dependencies(
   robot_control
   "rclcpp"
   "moveit_ros_planning_interface"
 )
+
+# Build a c++ library
+add_executable(robot_control_test src/robot_control_test.cpp)
+target_include_directories(robot_control_test PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(robot_control_test PUBLIC cxx_std_17)  # Require C++17
+ament_target_dependencies(
+  robot_control_test
+  "rclcpp"
+  "moveit_ros_planning_interface"
+)
+
+target_link_libraries(robot_control_test robot_control)
 
 find_package(rosidl_default_generators REQUIRED)
 
@@ -27,7 +43,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StringArray.msg"
 )
 
-install(TARGETS robot_control
+install(TARGETS robot_control robot_control_test
   DESTINATION lib/${PROJECT_NAME})
 
 add_executable(gripper_control src/gripper_control.cpp)
@@ -61,6 +77,11 @@ install(DIRECTORY
 
 install(DIRECTORY
   urdf
+  DESTINATION share/${PROJECT_NAME}/
+)
+
+install(DIRECTORY
+  include/
   DESTINATION share/${PROJECT_NAME}/
 )
 
