@@ -51,7 +51,7 @@ int main(int argc, char * argv[])
     robot_mover.printCurrentPose();
   } else if (choice == 4) {
     // 获取用户输入的目标位置和姿态
-    double px, py, pz, qx, qy, qz, qw;
+    double px, py, pz;
     std::cout << "Enter position (x, y, z): ";
     std::cin >> px >> py >> pz;
 
