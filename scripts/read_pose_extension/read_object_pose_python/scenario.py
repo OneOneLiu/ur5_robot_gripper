@@ -288,6 +288,8 @@ class UR_Tube_Scenario:
     def pub_tube_poses(self, horizon = 7, vertical = 2):
         # print("Published ids")
         poses_75 = PoseArray()
+        poses_75.header.frame_id = "isaac_world"
+        poses_75.header.stamp = self.node.get_clock().now().to_msg()
         poses_100 = []
         ids = []
         for i in range(horizon):
