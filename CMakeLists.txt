@@ -16,6 +16,8 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StringArray.msg"
+  "srv/PoseTransform.srv"
+  DEPENDENCIES builtin_interfaces geometry_msgs
 )
 
 # Build a robot_control c++ library
@@ -56,12 +58,13 @@ ament_target_dependencies(
   grasp_tube
   "rclcpp"
   "moveit_ros_planning_interface"
+  "geometry_msgs"
 )
 target_link_libraries(grasp_tube robot_control)
+rosidl_target_interfaces(grasp_tube ${PROJECT_NAME} "rosidl_typesupport_cpp")
 # Install the library and executable
 install(TARGETS grasp_tube
   DESTINATION lib/${PROJECT_NAME})
-
 
 add_executable(gripper_control src/gripper_control.cpp)
 target_include_directories(gripper_control PUBLIC
@@ -76,9 +79,12 @@ ament_target_dependencies(
 install(TARGETS gripper_control
   DESTINATION lib/${PROJECT_NAME})
 
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)
+
 # Install folders
 install(PROGRAMS
   scripts/pub_tf.py
+  scripts/pose_transform_server.py
   DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY

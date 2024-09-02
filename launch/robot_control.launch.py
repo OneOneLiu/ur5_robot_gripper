@@ -24,9 +24,18 @@ def generate_launch_description():
         name='pub_tf_node',
         output='screen'
     )
+    
+    # 启动 `ur5_robot_gripper` 包中的 `pose_transform_server.py` 节点
+    pose_transform_server_node = Node(
+        package='ur5_robot_gripper',
+        executable='pose_transform_server.py',
+        name='pose_transform_server_node',
+        output='screen'
+    )
 
     # 返回 LaunchDescription，其中包含要启动的两个节点
     return LaunchDescription([
         demo_launch,
-        pub_tf_node
+        pub_tf_node,
+        pose_transform_server_node
     ])
