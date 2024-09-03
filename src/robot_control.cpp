@@ -29,6 +29,13 @@ void RobotMover::moveToPosition(double px, double py, double pz)
   current_pose.position.y = py;
   current_pose.position.z = pz;
 
+  RCLCPP_INFO(rclcpp::get_logger("robot_control"), "moveToPosition function called");
+  // 打印当前姿态的位置和方向
+  RCLCPP_WARN(rclcpp::get_logger("robot_control"), 
+                "Current pose before move - Position: x=%.3f, y=%.3f, z=%.3f; Orientation: x=%.3f, y=%.3f, z=%.3f, w=%.3f", 
+                current_pose.position.x, current_pose.position.y, current_pose.position.z,
+                current_pose.orientation.x, current_pose.orientation.y, current_pose.orientation.z, current_pose.orientation.w);
+
   move_group_interface_.setPoseTarget(current_pose);
   executePlan();
 }

@@ -37,9 +37,14 @@ private:
 
     void moveToPositionCallback(const std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Request> request,
                                 std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Response> response)
-    {
+    {   
+        RCLCPP_WARN(this->get_logger(), "Received request to move to position: x=%.3f, y=%.3f, z=%.3f",
+                request->px, request->py, request->pz);
+
+        RCLCPP_WARN(this->get_logger(), "Calling moveToPosition with received coordinates...");
         robot_mover_->moveToPosition(request->px, request->py, request->pz);
         response->success = true;
+        RCLCPP_WARN(this->get_logger(), "Completed moveToPosition.");
     }
 
     rclcpp::Service<ur5_robot_gripper::srv::MoveToPose>::SharedPtr move_to_pose_service_;
