@@ -3,6 +3,7 @@ from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
+from moveit_configs_utils import MoveItConfigsBuilder
 import os
 
 def generate_launch_description():
@@ -32,10 +33,24 @@ def generate_launch_description():
         name='pose_transform_server_node',
         output='screen'
     )
+    
+    moveit_config = MoveItConfigsBuilder("ur5_gripper").to_moveit_configs()
+    
+    # 启动 `ur5_robot_gripper` 包中的 `robot_service_node` 节点
+    robot_service_node = Node(
+        package='ur5_robot_gripper',
+        executable='ur_robot_move_server',
+        output='screen',
+        parameters=[
+            moveit_config.robot_description_kinematics,  # Load kinematics.yaml
+            {"use_sim_time": True}, # 这个是必须的，否则会规划失败
+        ],
+    )
 
     # 返回 LaunchDescription，其中包含要启动的两个节点
     return LaunchDescription([
         demo_launch,
         pub_tf_node,
-        pose_transform_server_node
+        pose_transform_server_node,
+        robot_service_node
     ])

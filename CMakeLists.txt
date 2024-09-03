@@ -17,6 +17,8 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StringArray.msg"
   "srv/PoseTransform.srv"
+  "srv/MoveToPose.srv"
+  "srv/MoveToPosition.srv"
   DEPENDENCIES builtin_interfaces geometry_msgs
 )
 
@@ -66,6 +68,24 @@ rosidl_target_interfaces(grasp_tube ${PROJECT_NAME} "rosidl_typesupport_cpp")
 install(TARGETS grasp_tube
   DESTINATION lib/${PROJECT_NAME})
 
+# Build a robot_control service c++ executable
+add_executable(ur_robot_move_server src/ur_robot_move_server.cpp)
+target_include_directories(ur_robot_move_server PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(ur_robot_move_server PUBLIC cxx_std_17)  # Require C++17
+ament_target_dependencies(
+  ur_robot_move_server
+  "rclcpp"
+  "moveit_ros_planning_interface"
+  "geometry_msgs"
+)
+target_link_libraries(ur_robot_move_server robot_control)
+rosidl_target_interfaces(ur_robot_move_server ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# Install the library and executable
+install(TARGETS ur_robot_move_server
+  DESTINATION lib/${PROJECT_NAME})
+
 add_executable(gripper_control src/gripper_control.cpp)
 target_include_directories(gripper_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -85,6 +105,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)
 install(PROGRAMS
   scripts/pub_tf.py
   scripts/pose_transform_server.py
+  scripts/robot_control_client.py
   DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY

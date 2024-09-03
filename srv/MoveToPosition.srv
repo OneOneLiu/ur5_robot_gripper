@@ -1,0 +1,6 @@
+# MoveToPosition.srv
+float64 px
+float64 py
+float64 pz
+---
+bool success
