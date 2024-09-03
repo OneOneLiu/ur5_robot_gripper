@@ -107,6 +107,7 @@ install(PROGRAMS
   scripts/pose_transform_server.py
   scripts/robot_control_client.py
   scripts/grasp_tube.py
+  scripts/fake_sim_time.py
   DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY

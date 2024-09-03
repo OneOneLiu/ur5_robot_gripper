@@ -16,6 +16,7 @@ def generate_launch_description():
     # 启动 demo.launch.py
     demo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(demo_launch_path)
+        # launch_arguments={'use_sim_time': 'true'}.items()
     )
 
     # 启动 `ur5_robot_gripper` 包中的 `pub_tf.py` 节点
@@ -43,8 +44,14 @@ def generate_launch_description():
         output='screen',
         parameters=[
             moveit_config.robot_description_kinematics,  # Load kinematics.yaml
-            {"use_sim_time": True}, # 这个是必须的，否则会规划失败
+            # {"use_sim_time": True}, # 这个是必须的，否则会规划失败
         ],
+    )
+
+    fake_sim_time_node = Node(
+        package='ur5_robot_gripper',
+        executable='fake_sim_time.py',
+        output='screen',
     )
 
     # 返回 LaunchDescription，其中包含要启动的两个节点
@@ -52,5 +59,6 @@ def generate_launch_description():
         demo_launch,
         pub_tf_node,
         pose_transform_server_node,
-        robot_service_node
+        robot_service_node,
+        fake_sim_time_node
     ])
