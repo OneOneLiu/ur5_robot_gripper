@@ -12,7 +12,7 @@ class RobotClientNode(Node):
             self.get_logger().info('Service not available, waiting again...')
 
         self.get_logger().info('Service available, sending request...')
-        self.send_request(0.5, 0.3, 0.2)  # Example coordinates
+        self.send_request(0.5, 0.1, 0.2)  # Example coordinates
 
     def send_request(self, px, py, pz):
         request = MoveToPosition.Request()
