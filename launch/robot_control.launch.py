@@ -38,27 +38,27 @@ def generate_launch_description():
     moveit_config = MoveItConfigsBuilder("ur5_gripper").to_moveit_configs()
     
     # 启动 `ur5_robot_gripper` 包中的 `robot_service_node` 节点
-    robot_service_node = Node(
-        package='ur5_robot_gripper',
-        executable='ur_robot_move_server',
-        output='screen',
-        parameters=[
-            moveit_config.robot_description_kinematics,  # Load kinematics.yaml
-            # {"use_sim_time": True}, # 这个是必须的，否则会规划失败
-        ],
-    )
+    # robot_service_node = Node(
+    #     package='ur5_robot_gripper',
+    #     executable='ur_robot_move_server',
+    #     output='screen',
+    #     parameters=[
+    #         moveit_config.robot_description_kinematics,  # Load kinematics.yaml
+    #         # {"use_sim_time": True}, # 这个是必须的，否则会规划失败
+    #     ],
+    # )
 
-    fake_sim_time_node = Node(
-        package='ur5_robot_gripper',
-        executable='fake_sim_time.py',
-        output='screen',
-    )
+    # fake_sim_time_node = Node(
+    #     package='ur5_robot_gripper',
+    #     executable='fake_sim_time.py',
+    #     output='screen',
+    # )
 
     # 返回 LaunchDescription，其中包含要启动的两个节点
     return LaunchDescription([
         demo_launch,
         pub_tf_node,
         pose_transform_server_node,
-        robot_service_node,
-        fake_sim_time_node
+        # robot_service_node,
+        # fake_sim_time_node
     ])

@@ -1,30 +1,22 @@
-#include "rclcpp/rclcpp.hpp"
+#include "ur5_robot_gripper/robot_control.hpp"
 #include "ur5_robot_gripper/srv/move_to_pose.hpp"
 #include "ur5_robot_gripper/srv/move_to_position.hpp"
-#include "ur5_robot_gripper/robot_control.hpp"
+#include <rclcpp/rclcpp.hpp>
 #include <thread>
 
 class RobotServiceNode : public rclcpp::Node
 {
 public:
-    RobotServiceNode()
-    : Node("robot_service_node")
+    explicit RobotServiceNode(std::shared_ptr<RobotMover> robot_mover)
+    : Node("robot_service_node"), robot_mover_(robot_mover)
     {
-        // 初始化服务
         move_to_pose_service_ = this->create_service<ur5_robot_gripper::srv::MoveToPose>(
             "move_to_pose", std::bind(&RobotServiceNode::moveToPoseCallback, this, std::placeholders::_1, std::placeholders::_2));
 
         move_to_position_service_ = this->create_service<ur5_robot_gripper::srv::MoveToPosition>(
             "move_to_position", std::bind(&RobotServiceNode::moveToPositionCallback, this, std::placeholders::_1, std::placeholders::_2));
 
-        RCLCPP_INFO(this->get_logger(), "RobotServiceNode has started and is ready.");
-    }
-
-    void initializeRobotMover()
-    {
-        // 在构造函数外部初始化 RobotMover
-        robot_mover_ = std::make_shared<RobotMover>(shared_from_this());
-        RCLCPP_INFO(this->get_logger(), "RobotMover initialized.");
+        RCLCPP_INFO(this->get_logger(), "RobotServiceNode services are ready.");
     }
 
 private:
@@ -37,41 +29,40 @@ private:
 
     void moveToPositionCallback(const std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Request> request,
                                 std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Response> response)
-    {   
-        RCLCPP_WARN(this->get_logger(), "Received request to move to position: x=%.3f, y=%.3f, z=%.3f",
-                request->px, request->py, request->pz);
-
-        RCLCPP_WARN(this->get_logger(), "Calling moveToPosition with received coordinates...");
+    {
         robot_mover_->moveToPosition(request->px, request->py, request->pz);
         response->success = true;
-        RCLCPP_WARN(this->get_logger(), "Completed moveToPosition.");
     }
 
+    std::shared_ptr<RobotMover> robot_mover_;
     rclcpp::Service<ur5_robot_gripper::srv::MoveToPose>::SharedPtr move_to_pose_service_;
     rclcpp::Service<ur5_robot_gripper::srv::MoveToPosition>::SharedPtr move_to_position_service_;
-
-    std::shared_ptr<RobotMover> robot_mover_;
 };
 
-int main(int argc, char * argv[])
-{
-    rclcpp::init(argc, argv);
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initializing RobotServiceNode...");
+int main(int argc, char * argv[]) {
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<rclcpp::Node>("robot_moveit");
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node);
+  
+  // Creating and initializing RobotMover and Service Node
+  RobotMover robot_mover(node);
+  auto service_node = std::make_shared<RobotServiceNode>(std::make_shared<RobotMover>(node));
 
-    // 创建节点
-    auto node = std::make_shared<RobotServiceNode>();
-    node->initializeRobotMover();  // 在节点初始化后再初始化 RobotMover
+  // Adding service node to the executor
+  executor.add_node(service_node);
 
-    // 创建并启动多线程执行器
-    rclcpp::executors::MultiThreadedExecutor executor;
-    executor.add_node(node);
+  // Start the executor in a separate thread
+  std::thread executor_thread([&executor]() { executor.spin(); });
 
-    // 在单独的线程中启动执行器
-    std::thread executor_thread([&executor]() { executor.spin(); });
+  // Execute robot pose print directly
+  robot_mover.printCurrentPose();
 
-    // 等待执行器线程结束
-    executor_thread.join();
+  // Give some time for the node to process
+  rclcpp::sleep_for(std::chrono::seconds(1));
 
-    rclcpp::shutdown();
-    return 0;
+//   executor.cancel();
+  executor_thread.join();
+  rclcpp::shutdown();
+  return 0;
 }
