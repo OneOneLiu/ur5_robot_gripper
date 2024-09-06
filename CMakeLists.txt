@@ -53,6 +53,24 @@ rosidl_target_interfaces(robot_control_node ${PROJECT_NAME} "rosidl_typesupport_
 install(TARGETS robot_control_node
   DESTINATION lib/${PROJECT_NAME})
 
+# Build a robot_control service c++ executable
+add_executable(robot_function_test src/robot_function_test.cpp)
+target_include_directories(robot_function_test PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(robot_function_test PUBLIC cxx_std_17)  # Require C++17
+ament_target_dependencies(
+  robot_function_test
+  "rclcpp"
+  "moveit_ros_planning_interface"
+  "geometry_msgs"
+)
+target_link_libraries(robot_function_test robot_control)
+rosidl_target_interfaces(robot_function_test ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# Install the library and executable
+install(TARGETS robot_function_test
+  DESTINATION lib/${PROJECT_NAME})
+
 add_executable(gripper_control src/gripper_control.cpp)
 target_include_directories(gripper_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
