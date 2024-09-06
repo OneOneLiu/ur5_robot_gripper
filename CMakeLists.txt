@@ -19,6 +19,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/PoseTransform.srv"
   "srv/MoveToPose.srv"
   "srv/MoveToPosition.srv"
+  "srv/PrintPose.srv"
   DEPENDENCIES builtin_interfaces geometry_msgs
 )
 
@@ -34,56 +35,40 @@ ament_target_dependencies(
   "moveit_ros_planning_interface"
 )
 
-# Build a robot_control_test c++ executable
-add_executable(robot_control_test src/robot_control_test.cpp)
-target_include_directories(robot_control_test PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(robot_control_test PUBLIC cxx_std_17)  # Require C++17
-ament_target_dependencies(
-  robot_control_test
-  "rclcpp"
-  "moveit_ros_planning_interface"
-)
-target_link_libraries(robot_control_test robot_control)
-# Install the library and executable
-install(TARGETS robot_control robot_control_test
-  DESTINATION lib/${PROJECT_NAME})
-
-# Build a grasp_tube c++ executable
-add_executable(grasp_tube src/grasp_tube.cpp)
-target_include_directories(grasp_tube PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(grasp_tube PUBLIC cxx_std_17)  # Require C++17
-ament_target_dependencies(
-  grasp_tube
-  "rclcpp"
-  "moveit_ros_planning_interface"
-  "geometry_msgs"
-)
-target_link_libraries(grasp_tube robot_control)
-rosidl_target_interfaces(grasp_tube ${PROJECT_NAME} "rosidl_typesupport_cpp")
-# Install the library and executable
-install(TARGETS grasp_tube
-  DESTINATION lib/${PROJECT_NAME})
+# # Build a grasp_tube c++ executable
+# add_executable(grasp_tube src/grasp_tube.cpp)
+# target_include_directories(grasp_tube PUBLIC
+#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+#   $<INSTALL_INTERFACE:include>)
+# target_compile_features(grasp_tube PUBLIC cxx_std_17)  # Require C++17
+# ament_target_dependencies(
+#   grasp_tube
+#   "rclcpp"
+#   "moveit_ros_planning_interface"
+#   "geometry_msgs"
+# )
+# target_link_libraries(grasp_tube robot_control)
+# rosidl_target_interfaces(grasp_tube ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# # Install the library and executable
+# install(TARGETS grasp_tube
+#   DESTINATION lib/${PROJECT_NAME})
 
 # Build a robot_control service c++ executable
-add_executable(ur_robot_move_server src/ur_robot_move_server.cpp)
-target_include_directories(ur_robot_move_server PUBLIC
+add_executable(robot_control_node src/robot_control_node.cpp)
+target_include_directories(robot_control_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(ur_robot_move_server PUBLIC cxx_std_17)  # Require C++17
+target_compile_features(robot_control_node PUBLIC cxx_std_17)  # Require C++17
 ament_target_dependencies(
-  ur_robot_move_server
+  robot_control_node
   "rclcpp"
   "moveit_ros_planning_interface"
   "geometry_msgs"
 )
-target_link_libraries(ur_robot_move_server robot_control)
-rosidl_target_interfaces(ur_robot_move_server ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(robot_control_node robot_control)
+rosidl_target_interfaces(robot_control_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 # Install the library and executable
-install(TARGETS ur_robot_move_server
+install(TARGETS robot_control_node
   DESTINATION lib/${PROJECT_NAME})
 
 add_executable(gripper_control src/gripper_control.cpp)
