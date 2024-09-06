@@ -19,16 +19,26 @@ class PoseTransformService(Node):
             # 获取从 source_frame 到 target_frame 的变换
             transform = self.tf_buffer.lookup_transform(
                 request.target_frame,
-                request.pose.header.frame_id,  # source_frame
+                request.source_frame,  # source_frame
                 rclpy.time.Time(),  # 获取最新的变换
                 timeout=rclpy.duration.Duration(seconds=1.0)
             )
 
             # 应用变换到姿态
+            self.get_logger().info("I am here")
             transformed_pose = tf2_geometry_msgs.do_transform_pose(request.pose, transform)
+            self.get_logger().info("I am here.")
             response.transformed_pose = transformed_pose
             self.get_logger().info(f"Pose transformed to frame {request.target_frame}.")
+            
+            # Checking if response is NoneType
+            if response is None:
+                self.get_logger().error("Response is NoneType.")
+            else:
+                self.get_logger().info(f"Response is not NoneType: {response}")
+
             return response
+
         except tf2_ros.TransformException as ex:
             self.get_logger().error(f"Transform failed: {ex}")
             return None

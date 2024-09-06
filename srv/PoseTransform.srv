@@ -1,4 +1,5 @@
-geometry_msgs/PoseStamped pose
+geometry_msgs/Pose pose
 string target_frame
+string source_frame
 ---
-geometry_msgs/PoseStamped transformed_pose
+geometry_msgs/Pose transformed_pose
