@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseArray, PoseStamped
+from geometry_msgs.msg import PoseArray, Pose
 from ur5_robot_gripper.srv import MoveToPosition
 from ur5_robot_gripper.srv import PoseTransform
 import time
 import threading
 
 class PoseSubscriber(Node):
-    def __init__(self, node):
+    def __init__(self):
         super().__init__('pose_subscriber')
         self.get_logger().info('PoseSubscriber node initialized.')
 
         # Create a client for the MoveToPosition service
-        self.move_to_position_client = node.create_client(MoveToPosition, 'move_to_position')
+        self.move_to_position_client = self.create_client(MoveToPosition, 'move_to_position')
         self.get_logger().info('MoveToPosition service client created.')
         while not self.move_to_position_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Waiting for move_to_position service to become available...')
@@ -40,11 +40,15 @@ class PoseSubscriber(Node):
         # 如果姿态数组小于14，记录警告信息
         if len(msg.poses) < 14:
             self.get_logger().warn('Received PoseArray has less than 14 poses.')
-            return
-
+            return 0
+        
+        self.pose_msg = msg
+        threading.Thread(target=self.move_to_tube_poses).start()
+    
+    def move_to_tube_poses(self):
         # 循环遍历从第1到第14个姿态
         for i in range(14):
-            target_pose = msg.poses[i]
+            target_pose = self.pose_msg.poses[i]
             self.get_logger().warn(f'target_pose_type: {type(target_pose)}')
             # 打印目标姿态的位置和方向
             self.get_logger().info(f'Moving to pose {i + 1}...')
@@ -54,19 +58,17 @@ class PoseSubscriber(Node):
                                    f'y={target_pose.orientation.y:.3f}, z={target_pose.orientation.z:.3f}, '
                                    f'w={target_pose.orientation.w:.3f}')
 
-
-            transformed_pose = self.call_pose_transform_service(target_pose, target_frame='base_link', source_frame=msg.header.frame_id)
-
+            self.get_logger().warn(f'source frame: {self.pose_msg.header.frame_id}')
+            transformed_pose = self.call_pose_transform_service(target_pose, target_frame='base_link', source_frame=self.pose_msg.header.frame_id)
+            
             # 使用服务请求来移动到指定位置
             self.call_move_to_position_service(
-                self.transformed_pose.position.y,
-                self.transformed_pose.position.x,
-                self.transformed_pose.position.z
+                transformed_pose.position.y,
+                transformed_pose.position.x,
+                transformed_pose.position.z
             )
-
-            # 可以选择在每次移动后进行一个小的延时，以确保运动稳定
-            time.sleep(2)  # 根据需要调整时间
-
+    
+    # TODO:这里改成action
     def call_move_to_position_service(self, x, y, z):
         self.get_logger().info(f'Calling MoveToPosition service with x={x}, y={y}, z={z}.')
         
@@ -94,10 +96,8 @@ class PoseSubscriber(Node):
         request.pose = pose_stamped
         request.target_frame = target_frame
         request.source_frame = source_frame
-        self.get_logger().info("I am here1.")
         # 发送请求并等待结果
         future = self.tf_client.call_async(request)
-        self.get_logger().info("I am here2.")
         self.get_logger().info(f'PoseTransform service request sent with pose: {request.pose}, waiting for response...')
         # 使用 spin_until_future_complete 确保等待响应
         rclpy.spin_until_future_complete(self, future, timeout_sec=30.0)
@@ -111,9 +111,6 @@ class PoseSubscriber(Node):
             else:
                 self.get_logger().error("Received None response from PoseTransform service.")
                 return None
-            self.get_logger().info("I am here4.")
-            self.get_logger().info(f"Transformed Pose: {response.transformed_pose}")
-            self.get_logger().info("I am here5.")
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
 
@@ -124,23 +121,18 @@ def main(args=None):
     rclpy.logging.get_logger('main').info('Initializing ROS...')
 
     # 创建主节点
-    node = rclpy.create_node('main_node')
+    node = PoseSubscriber()
     rclpy.logging.get_logger('main').info('Main node created.')
-
-    # 创建 PoseSubscriber 实例
-    subscriber_node = PoseSubscriber(node)
 
     # 创建并启动多线程执行器
     executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(node)
-    executor.add_node(subscriber_node)
 
     rclpy.logging.get_logger('main').info('Starting to spin with multi-threaded executor.')
 
     # 在单独的线程中启动执行器
     executor_thread = threading.Thread(target=executor.spin)
     executor_thread.start()
-
     # 等待执行器线程结束
     executor_thread.join()
 
