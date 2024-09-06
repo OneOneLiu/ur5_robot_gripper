@@ -54,15 +54,20 @@ void RobotMover::moveToPose(double px, double py, double pz, double qx, double q
 void RobotMover::moveToPosition(double px, double py, double pz)
 {
   auto current_pose = move_group_interface_.getCurrentPose().pose;
+  // 打印当前姿态的位置和方向
+  RCLCPP_WARN(rclcpp::get_logger("robot_control"), 
+                "Current pose before move - Position: x=%.3f, y=%.3f, z=%.3f; Orientation: x=%.3f, y=%.3f, z=%.3f, w=%.3f", 
+                current_pose.position.x, current_pose.position.y, current_pose.position.z,
+                current_pose.orientation.x, current_pose.orientation.y, current_pose.orientation.z, current_pose.orientation.w);
+
   current_pose.position.x = px;
   current_pose.position.y = py;
   current_pose.position.z = pz;
 
-  RCLCPP_INFO(rclcpp::get_logger("robot_control"), "moveToPosition function called");
-  // 打印当前姿态的位置和方向
-  RCLCPP_DEBUG(rclcpp::get_logger("robot_control"), 
-                "Current pose before move - Position: x=%.3f, y=%.3f, z=%.3f; Orientation: x=%.3f, y=%.3f, z=%.3f, w=%.3f", 
-                current_pose.position.x, current_pose.position.y, current_pose.position.z,
+  RCLCPP_WARN(rclcpp::get_logger("robot_control"), "moveToPosition function called");
+  RCLCPP_WARN(rclcpp::get_logger("robot_control"), 
+                "Target pose - Position: x=%.3f, y=%.3f, z=%.3f; Orientation: x=%.3f, y=%.3f, z=%.3f, w=%.3f", 
+                px, py, pz,
                 current_pose.orientation.x, current_pose.orientation.y, current_pose.orientation.z, current_pose.orientation.w);
 
   move_group_interface_.setPoseTarget(current_pose);
