@@ -35,24 +35,6 @@ ament_target_dependencies(
   "moveit_ros_planning_interface"
 )
 
-# # Build a grasp_tube c++ executable
-# add_executable(grasp_tube src/grasp_tube.cpp)
-# target_include_directories(grasp_tube PUBLIC
-#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-#   $<INSTALL_INTERFACE:include>)
-# target_compile_features(grasp_tube PUBLIC cxx_std_17)  # Require C++17
-# ament_target_dependencies(
-#   grasp_tube
-#   "rclcpp"
-#   "moveit_ros_planning_interface"
-#   "geometry_msgs"
-# )
-# target_link_libraries(grasp_tube robot_control)
-# rosidl_target_interfaces(grasp_tube ${PROJECT_NAME} "rosidl_typesupport_cpp")
-# # Install the library and executable
-# install(TARGETS grasp_tube
-#   DESTINATION lib/${PROJECT_NAME})
-
 # Build a robot_control service c++ executable
 add_executable(robot_control_node src/robot_control_node.cpp)
 target_include_directories(robot_control_node PUBLIC
