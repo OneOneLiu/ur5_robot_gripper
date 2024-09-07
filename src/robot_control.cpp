@@ -14,7 +14,16 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
     );
     move_to_position_service_ = this->create_service<ur5_robot_gripper::srv::MoveToPosition>(
             "move_to_position", std::bind(&RobotMover::handleMovePositionRequest, this, std::placeholders::_1, std::placeholders::_2));
-
+    
+    // 创建 Action Server
+    this->action_server_ = rclcpp_action::create_server<MoveToPositionAction>(
+      this,
+      "move_to_position_action", // 与服务区分开
+      std::bind(&RobotMover::handleGoal, this, std::placeholders::_1, std::placeholders::_2),
+      std::bind(&RobotMover::handleCancel, this, std::placeholders::_1),
+      std::bind(&RobotMover::handleAccepted, this, std::placeholders::_1)
+    );
+    
     // Add the node to the executor and start the executor thread
     executor_->add_node(node_);
     executor_thread_ = std::thread([this]() {
@@ -109,3 +118,57 @@ void RobotMover::handleMovePositionRequest(const std::shared_ptr<ur5_robot_gripp
         moveToPosition(request->px, request->py, request->pz);
         response->success = true;
     }
+
+// Action goal处理函数
+rclcpp_action::GoalResponse RobotMover::handleGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPositionAction::Goal> goal)
+{
+    RCLCPP_INFO(this->get_logger(), "Received action goal to move to position (x=%.2f, y=%.2f, z=%.2f)", 
+                goal->px, goal->py, goal->pz);
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
+// Action取消处理函数
+rclcpp_action::CancelResponse RobotMover::handleCancel(const std::shared_ptr<GoalHandleMoveToPositionAction> goal_handle)
+{
+    RCLCPP_INFO(this->get_logger(), "Received cancel request");
+    return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+// Action执行函数
+void RobotMover::handleAccepted(const std::shared_ptr<GoalHandleMoveToPositionAction> goal_handle)
+{
+    std::thread([this, goal_handle]() {
+        executeGoal(goal_handle);
+    }).detach();
+}
+
+// 执行运动并发布反馈
+void RobotMover::executeGoal(const std::shared_ptr<GoalHandleMoveToPositionAction> goal_handle)
+{
+    RCLCPP_INFO(this->get_logger(), "Executing action goal...");
+
+    const auto goal = goal_handle->get_goal();
+    auto feedback = std::make_shared<MoveToPositionAction::Feedback>();
+    auto result = std::make_shared<MoveToPositionAction::Result>();
+
+    // 调用 moveToPosition 而不是直接调用 Action
+    moveToPosition(goal->px, goal->py, goal->pz);
+
+    // 模拟运动执行反馈
+    for (int i = 0; i <= 100; ++i) {
+        if (goal_handle->is_canceling()) {
+            result->success = false;
+            goal_handle->canceled(result);
+            RCLCPP_INFO(this->get_logger(), "Action goal canceled");
+            return;
+        }
+
+        feedback->percentage_complete = i;
+        goal_handle->publish_feedback(feedback);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    result->success = true;
+    goal_handle->succeed(result);
+    RCLCPP_INFO(this->get_logger(), "Action goal completed successfully");
+}

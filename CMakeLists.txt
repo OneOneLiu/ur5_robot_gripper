@@ -5,6 +5,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -13,6 +15,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 # Generate custom ROS messages
 find_package(rosidl_default_generators REQUIRED)
+find_package(action_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StringArray.msg"
@@ -20,7 +23,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/MoveToPose.srv"
   "srv/MoveToPosition.srv"
   "srv/PrintPose.srv"
-  DEPENDENCIES builtin_interfaces geometry_msgs
+  "action/MoveToPositionAction.action"
+  DEPENDENCIES builtin_interfaces geometry_msgs action_msgs
 )
 
 # Build a robot_control c++ library
@@ -46,6 +50,7 @@ ament_target_dependencies(
   "rclcpp"
   "moveit_ros_planning_interface"
   "geometry_msgs"
+  "rclcpp_action"
 )
 target_link_libraries(robot_control_node robot_control)
 rosidl_target_interfaces(robot_control_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
@@ -83,8 +88,6 @@ ament_target_dependencies(
 )
 install(TARGETS gripper_control
   DESTINATION lib/${PROJECT_NAME})
-
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)
 
 # Install folders
 install(PROGRAMS
