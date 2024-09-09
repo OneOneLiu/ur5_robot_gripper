@@ -24,16 +24,21 @@ class PoseSubscriber(Node):
         
         # 
         self._action_client = ActionClient(self, MoveToPositionAction, 'move_to_position_action')
+        self.action_done = True
 
     def pose_callback(self, msg):
-        self.get_logger().info('Received PoseArray message.')
+        if self.action_done:
+            self.send_action_goal([0.1, 0.1, 0.27])
+            self.action_done = False
+
+            return 0
 
         # 如果姿态数组小于14，记录警告信息
         if len(msg.poses) < 14:
             self.get_logger().warn('Received PoseArray has less than 14 poses.')
             return 0
         self.pose_msg = msg
-        self.get_logger().info('Received and saved tube75 poses.')
+        self.get_logger().debug('Received and saved tube75 poses.')
 
     def send_action_goal(self, position):
         '''
@@ -51,8 +56,27 @@ class PoseSubscriber(Node):
         
         self._action_client.wait_for_server()
         rclpy.logging.get_logger('send_action_goal').info('Found action server.')
+        self._send_goal_future = self._action_client.send_goal_async(goal_msg)
         
-        return self._action_client.send_goal_async(goal_msg)
+        self._send_goal_future.add_done_callback(self.goal_response_callback)
+
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('Goal rejected :(')
+            return
+
+        self.get_logger().info('Goal accepted :)')
+        self._get_result_future = goal_handle.get_result_async()
+        self._get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        self.get_logger().info('Received Done signal :)')
+        result = future.result().result
+        self.get_logger().info('Result: {0}'.format(result))
+        if result.success:
+            self.get_logger().info('Goal succeeded!')
+            self.action_done = True
 
 def main(args=None):
     rclpy.init(args=args)
@@ -69,9 +93,7 @@ def main(args=None):
     # executor.spin()
     
     # Send one action request test
-    future = node.send_action_goal([0.1, 0.1, 0.27])
-    rclpy.logging.get_logger('main').info('Sent action goal.')
-    rclpy.spin_until_future_complete(node, future)
+    rclpy.spin(node)
 
     rclpy.logging.get_logger('main').info('Shutting down ROS...')
 

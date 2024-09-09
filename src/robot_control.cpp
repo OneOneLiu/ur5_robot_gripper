@@ -154,19 +154,19 @@ void RobotMover::executeGoal(const std::shared_ptr<GoalHandleMoveToPositionActio
     // 调用 moveToPosition 而不是直接调用 Action
     moveToPosition(goal->px, goal->py, goal->pz);
 
-    // 模拟运动执行反馈
-    for (int i = 0; i <= 100; ++i) {
-        if (goal_handle->is_canceling()) {
-            result->success = false;
-            goal_handle->canceled(result);
-            RCLCPP_INFO(this->get_logger(), "Action goal canceled");
-            return;
-        }
+    // // 模拟运动执行反馈
+    // for (int i = 0; i <= 100; ++i) {
+    //     if (goal_handle->is_canceling()) {
+    //         result->success = false;
+    //         goal_handle->canceled(result);
+    //         RCLCPP_INFO(this->get_logger(), "Action goal canceled");
+    //         return;
+    //     }
 
-        feedback->percentage_complete = i;
-        goal_handle->publish_feedback(feedback);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
+    //     feedback->percentage_complete = i;
+    //     goal_handle->publish_feedback(feedback);
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // }
 
     result->success = true;
     goal_handle->succeed(result);
