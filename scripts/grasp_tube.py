@@ -5,6 +5,9 @@ from geometry_msgs.msg import PoseArray, Pose
 from ur5_robot_gripper.srv import PoseTransform
 import time
 
+from rclpy.action import ActionClient
+from ur5_robot_gripper.action import MoveToPositionAction
+
 class PoseSubscriber(Node):
     def __init__(self):
         super().__init__('pose_subscriber')
@@ -19,6 +22,8 @@ class PoseSubscriber(Node):
         )
         self.get_logger().info('Subscribed to /tube75_poses topic.')
         
+        # 
+        self._action_client = ActionClient(self, MoveToPositionAction, 'move_to_position_action')
 
     def pose_callback(self, msg):
         self.get_logger().info('Received PoseArray message.')
@@ -29,7 +34,25 @@ class PoseSubscriber(Node):
             return 0
         self.pose_msg = msg
         self.get_logger().info('Received and saved tube75 poses.')
-    
+
+    def send_action_goal(self, position):
+        '''
+        发送目标位置给action server
+        args:
+            position: 目标位置
+                px: position[0]
+                py: position[1]
+                pz: position[2]
+        '''
+        goal_msg = MoveToPositionAction.Goal()
+        goal_msg.px = position[0]
+        goal_msg.py = position[1]
+        goal_msg.pz = position[2]
+        
+        self._action_client.wait_for_server()
+        rclpy.logging.get_logger('send_action_goal').info('Found action server.')
+        
+        return self._action_client.send_goal_async(goal_msg)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -40,10 +63,15 @@ def main(args=None):
     rclpy.logging.get_logger('main').info('Main node created.')
 
     # 创建并启动多线程执行器
-    executor = rclpy.executors.MultiThreadedExecutor()
-    executor.add_node(node)
+    # executor = rclpy.executors.MultiThreadedExecutor()
+    # executor.add_node(node)
 
-    executor.spin()
+    # executor.spin()
+    
+    # Send one action request test
+    future = node.send_action_goal([0.1, 0.1, 0.27])
+    rclpy.logging.get_logger('main').info('Sent action goal.')
+    rclpy.spin_until_future_complete(node, future)
 
     rclpy.logging.get_logger('main').info('Shutting down ROS...')
 
