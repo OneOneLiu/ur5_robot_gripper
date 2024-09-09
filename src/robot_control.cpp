@@ -80,6 +80,8 @@ void RobotMover::moveToPosition(double px, double py, double pz)
                 current_pose.orientation.x, current_pose.orientation.y, current_pose.orientation.z, current_pose.orientation.w);
 
   move_group_interface_.setPoseTarget(current_pose);
+  move_group_interface_.setGoalOrientationTolerance(0.15); // Radians, adjust as needed
+  move_group_interface_.setGoalPositionTolerance(0.01); // Meters, adjust as needed
   executePlan();
 }
 
