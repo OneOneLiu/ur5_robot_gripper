@@ -5,87 +5,128 @@ from geometry_msgs.msg import PoseStamped
 from omni.isaac.dynamic_control import _dynamic_control
 import numpy as np
 
-# dc=_dynamic_control.acquire_dynamic_control_interface()
+from omni.isaac.core import World
 
-# object=dc.get_rigid_body("/World/tube75/tube75_0_0/tube75/tube75")
+dc=_dynamic_control.acquire_dynamic_control_interface()
+
+# object=dc.get_rigid_body("/World/tube75")
+# object_pose=dc.get_rigid_body_pose(object)
+
+# print("path:/World/tube75")
+# print("position:", object_pose.p)
+# print("rotation:", object_pose.r)
+
+# print("path:/World/tube75/tube75")
+# object=dc.get_rigid_body("/World/tube75/tube75")
 # object_pose=dc.get_rigid_body_pose(object)
 
 # print("position:", object_pose.p)
 # print("rotation:", object_pose.r)
 
+# print("path:/World/tube75/tube75/Cap")
+# object=dc.get_rigid_body("/World/tube75/tube75/Cap")
+# object_pose=dc.get_rigid_body_pose(object)
+
+# print("position:", object_pose.p)
+# print("rotation:", object_pose.r)
+
+print("path:/World/cube")
+object=dc.get_rigid_body("/World/cube")
+print(type(object))
+object_pose=dc.get_rigid_body_pose(object)
+
+print("position:", object_pose.p)
+print("rotation:", object_pose.r)
+
+world = World()
+# from omni.isaac.core.objects import DynamicCuboid
+# fancy_cube =  world.scene.add(
+#     DynamicCuboid(
+#         prim_path="/World/random_cube",
+#         name="fancy_cube",
+#         position=np.array([0, 0, 1.0]),
+#         scale=np.array([0.5015, 0.5015, 0.5015]),
+#         color=np.array([0, 0, 1.0]),
+#     ))
+cube = world.scene.get_object("fancy_cube")
+print(type(cube))
+position, orientation = cube.get_world_pose()
+print(position, orientation)
 # # https://forums.developer.nvidia.com/t/get-position-of-primitive/146702
+# https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/Documentation/Isaac-Sim-Docs_2022.2.1/isaacsim/latest/tutorial_core_hello_world.html
+# https://blog.csdn.net/m0_56661101/article/details/133789186
 
-class ObjectPosePublisher(Node):
-    def __init__(self, object_path):
-        super().__init__('object_pose_publisher')
-        self.object_path = object_path
+# class ObjectPosePublisher(Node):
+#     def __init__(self, object_path):
+#         super().__init__('object_pose_publisher')
+#         self.object_path = object_path
 
-        # Initialize the ROS publisher
-        self.publisher_ = self.create_publisher(PoseStamped, 'object_pose', 10)
+#         # Initialize the ROS publisher
+#         self.publisher_ = self.create_publisher(PoseStamped, 'object_pose', 10)
 
-        # Initialize the dynamic control interface
-        self.dc = _dynamic_control.acquire_dynamic_control_interface()
+#         # Initialize the dynamic control interface
+#         self.dc = _dynamic_control.acquire_dynamic_control_interface()
 
-        # Timer to periodically publish the pose
-        self.timer = self.create_timer(0.1, self.publish_pose)
+#         # Timer to periodically publish the pose
+#         self.timer = self.create_timer(0.1, self.publish_pose)
 
-    def publish_pose(self):
-        # Get the rigid body handle
-        obj = self.dc.get_rigid_body(self.object_path)
+#     def publish_pose(self):
+#         # Get the rigid body handle
+#         obj = self.dc.get_rigid_body(self.object_path)
 
-        if obj is None:
-            self.get_logger().warn(f"Object {self.object_path} not found!")
-            return
+#         if obj is None:
+#             self.get_logger().warn(f"Object {self.object_path} not found!")
+#             return
 
-        # Get the pose of the object in world coordinates
-        pose = self.dc.get_rigid_body_pose(obj)
+#         # Get the pose of the object in world coordinates
+#         pose = self.dc.get_rigid_body_pose(obj)
 
-        # Check if the quaternion is valid (non-zero and normalized)
-        rotation = np.array([pose.r.x, pose.r.y, pose.r.z, pose.r.w])
-        norm = np.linalg.norm(rotation)
-        if norm == 0 or not np.isfinite(norm):
-            self.get_logger().warn(f"Invalid quaternion received for {self.object_path}. Setting to default identity rotation.")
-            rotation = np.array([0.0, 0.0, 0.0, 1.0])
-        else:
-            rotation /= norm  # Normalize the quaternion
+#         # Check if the quaternion is valid (non-zero and normalized)
+#         rotation = np.array([pose.r.x, pose.r.y, pose.r.z, pose.r.w])
+#         norm = np.linalg.norm(rotation)
+#         if norm == 0 or not np.isfinite(norm):
+#             self.get_logger().warn(f"Invalid quaternion received for {self.object_path}. Setting to default identity rotation.")
+#             rotation = np.array([0.0, 0.0, 0.0, 1.0])
+#         else:
+#             rotation /= norm  # Normalize the quaternion
 
-        # Create a PoseStamped message
-        pose_msg = PoseStamped()
-        pose_msg.header.stamp = self.get_clock().now().to_msg()
-        pose_msg.header.frame_id = 'world'  # You can change this to the relevant frame_id
+#         # Create a PoseStamped message
+#         pose_msg = PoseStamped()
+#         pose_msg.header.stamp = self.get_clock().now().to_msg()
+#         pose_msg.header.frame_id = 'world'  # You can change this to the relevant frame_id
 
-        # Set the position
-        pose_msg.pose.position.x = pose.p.x
-        pose_msg.pose.position.y = pose.p.y
-        pose_msg.pose.position.z = pose.p.z
+#         # Set the position
+#         pose_msg.pose.position.x = pose.p.x
+#         pose_msg.pose.position.y = pose.p.y
+#         pose_msg.pose.position.z = pose.p.z
 
-        # Set the orientation
-        pose_msg.pose.orientation.x = rotation[0]
-        pose_msg.pose.orientation.y = rotation[1]
-        pose_msg.pose.orientation.z = rotation[2]
-        pose_msg.pose.orientation.w = rotation[3]
+#         # Set the orientation
+#         pose_msg.pose.orientation.x = rotation[0]
+#         pose_msg.pose.orientation.y = rotation[1]
+#         pose_msg.pose.orientation.z = rotation[2]
+#         pose_msg.pose.orientation.w = rotation[3]
 
-        # Publish the pose
-        self.publisher_.publish(pose_msg)
-        self.get_logger().info(f"Published pose of {self.object_path}.")
+#         # Publish the pose
+#         self.publisher_.publish(pose_msg)
+#         self.get_logger().info(f"Published pose of {self.object_path}.")
 
-def main(args=None):
-    rclpy.init(args=args)
+# def main(args=None):
+#     rclpy.init(args=args)
 
-    # Define the path to your object in the Isaac Sim scene
-    object_path = "/World/tube75/tube75_0_0/tube75/tube75"
+#     # Define the path to your object in the Isaac Sim scene
+#     object_path = "/World/tube75/tube75"
 
-    # Create the ROS node and start publishing
-    node = ObjectPosePublisher(object_path)
+#     # Create the ROS node and start publishing
+#     node = ObjectPosePublisher(object_path)
 
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+#     try:
+#         rclpy.spin(node)
+#     except KeyboardInterrupt:
+#         pass
 
-    # Clean up
-    node.destroy_node()
-    rclpy.shutdown()
+#     # Clean up
+#     node.destroy_node()
+#     rclpy.shutdown()
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()
