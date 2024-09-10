@@ -15,6 +15,9 @@ from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 import tf2_geometry_msgs
 
+import numpy as np
+from transforms3d.quaternions import quat2mat
+
 class PoseSubscriber(Node):
     def __init__(self):
         super().__init__('pose_subscriber')
@@ -33,7 +36,7 @@ class PoseSubscriber(Node):
         self._action_client = ActionClient(self, MoveToPositionAction, 'move_to_position_action')
         self.action_done = True
         self.tube_index = 0
-        
+
         # 创建一个tf2 listener
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -48,8 +51,42 @@ class PoseSubscriber(Node):
         
         # 如果动作已经完成，执行下一个动作
         if self.action_done:
-            trasnsformed_pose = self.transform_pose(self.pose_msg.poses[self.tube_index], 'isaac_world', 'base_link')
-            self.send_action_goal([trasnsformed_pose.position.x, trasnsformed_pose.position.y, trasnsformed_pose.position.z+0.2])
+            transformed_pose = self.transform_pose(self.pose_msg.poses[self.tube_index], 'isaac_world', 'base_link')
+            # calculate orientation
+            q = [self.pose_msg.poses[self.tube_index].orientation.w, self.pose_msg.poses[self.tube_index].orientation.x, self.pose_msg.poses[self.tube_index].orientation.y, self.pose_msg.poses[self.tube_index].orientation.z]
+            # 打印圆柱体中心位置
+            self.get_logger().warn("圆柱体中心位置: {},{},{}".format(self.pose_msg.poses[self.tube_index].position.x, self.pose_msg.poses[self.tube_index].position.y, self.pose_msg.poses[self.tube_index].position.z))
+            # 将四元数转换为旋转矩阵
+            rotation_matrix = quat2mat(q)
+            # 提取旋转矩阵的第三列作为圆柱体的Z轴
+            cylinder_z_axis = rotation_matrix[:, 2]
+            # 打印圆柱体Z轴方向
+            self.get_logger().warn("圆柱体Z轴方向: {}, {}, {}".format(cylinder_z_axis[0], cylinder_z_axis[1], cylinder_z_axis[2]))
+            
+            # 定义向上方向（假设沿着世界坐标系的Z轴）
+            up_direction = np.array([0, 0, 1])
+
+            # 第一次叉乘，得到与Z轴和向上方向垂直的水平向量
+            vector_horiz = np.cross(cylinder_z_axis, up_direction)
+
+            # 检查是否为零向量
+            if np.linalg.norm(vector_horiz) == 0:
+                # 如果为零，说明两个向量平行，选择另一个方向，例如X轴 # TODO: 思考为什么选择X轴
+                up_direction = np.array([1, 0, 0])
+                vector_horiz = np.cross(cylinder_z_axis, up_direction)
+
+            # 归一化水平向量
+            vector_horiz = vector_horiz / np.linalg.norm(vector_horiz)
+            self.get_logger().warn("水平向量:{}, {}, {}".format(vector_horiz[0], vector_horiz[1], vector_horiz[2]))
+
+            # 第二次叉乘，计算朝上边线的方向
+            result_vector = np.cross(vector_horiz, cylinder_z_axis)
+
+            # 归一化结果向量
+            result_vector = result_vector / np.linalg.norm(result_vector)
+            self.get_logger().warn("朝上边线方向:{}, {}, {}".format(result_vector[0], result_vector[1], result_vector[2]))
+
+            self.send_action_goal([transformed_pose.position.x, transformed_pose.position.y, transformed_pose.position.z+0.2])
             self.action_done = False
             self.tube_index += 1
             if self.tube_index == 14:
