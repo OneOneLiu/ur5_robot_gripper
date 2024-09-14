@@ -1,5 +1,8 @@
+#!/usr/bin/env python3
+
+# 理解World对象的功能以及工作方式
+
 from omni.isaac.core import World
-import numpy as np
 
 # Hello world: https://docs.omniverse.nvidia.com/isaacsim/latest/core_api_tutorials/tutorial_core_hello_world.html
 
