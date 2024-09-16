@@ -63,6 +63,10 @@ class UR_Tube_Scenario:
         self.rate = self.node.create_rate(30)  # 10 Hz
         self._stop_thread = False
         self.pub_thread = threading.Thread(target=self.pub_tube_poses)
+        
+        # # Set the horizon and vertical for tube numbers
+        self.horizon = 4
+        self.vertical = 1
 
     def load_example_assets(self):
         """Load assets onto the stage and return them so they can be registered with the
@@ -99,8 +103,8 @@ class UR_Tube_Scenario:
         
         ## Load the tubes
         tube75_asset_path = "{}/tube75/tube75.usd".format(self.assests_root_path)
-        for i in range (7):
-            for j in range(2):
+        for i in range (self.horizon):
+            for j in range(self.vertical):
                 self.load_usd_assets(prim_path="/World/tube75/tube75_{}_{}".format(i,j), usd_path=tube75_asset_path)
                 rotation = (0.0, 0.0, 0.0)
                 if j:
@@ -108,8 +112,8 @@ class UR_Tube_Scenario:
                 self.set_object_transforms("/World/tube75/tube75_{}_{}".format(i,j), (0.5 + 0.05*j, 0.05+0.035*j, 0.07+0.045*i), rotation, (0.001, 0.001, 0.001))
         
         tube100_asset_path = "{}/tube100/tube100.usd".format(self.assests_root_path)
-        for i in range (7):
-            for j in range(2):
+        for i in range (self.horizon):
+            for j in range(self.vertical):
                 self.load_usd_assets(prim_path="/World/tube100/tube100_{}_{}".format(i,j), usd_path=tube100_asset_path)
                 rotation = (0.0, 0.0, 0.0)
                 if j:
@@ -271,7 +275,7 @@ class UR_Tube_Scenario:
         self.dc = _dynamic_control.acquire_dynamic_control_interface()
         # 然后你可以使用 get_world_pose()
         while True:  # 无限循环
-            self.pub_tube_poses()
+            self.pub_tube_poses(self.horizon, self.vertical)
 
             yield  # 在每个仿真步骤中暂停执行，等待下一步
 

@@ -49,17 +49,31 @@ def draw_line_with_arrow(start_point, direction, length, color=(1.0, 0.0, 0.0, 1
     )
 
 # 使用示例
-start = (  0.48903465270996094,0.16054636240005493,0.006851098500192165)  # 起点
-direction = ( -0.009354244011200441, -0.9994058682640286, -0.033172407184313135)  # 方向向量
-length = 0.1  # 线的长度
-draw_line_with_arrow(start, direction, length, color=(1.0, 0.0, 0.0, 1.0), arrow_size=0.01)
-
-start = (0.48903465270996094,0.16054636240005493,0.006851098500192165)  # 起点
-direction = ( -0.9999561999033177, 0.009359395008012113, 0.0 )  # 方向向量
-length = 0.1  # 线的长度
+## 画出tube的局部坐标系
+start = (0.44589391350746155,0.033495668321847916,0.001561759039759636)  # 起点
+direction = ( 0.3049119959512959, 0.9186423864602333, 0.25124657315801197)  # 物体轴线方向向量
+length = 0.05  # 线的长度
 draw_line_with_arrow(start, direction, length, color=(0.0, 1.0, 0.0, 1.0), arrow_size=0.01)
 
-start = (0.48903465270996094,0.16054636240005493,0.006851098500192165)  # 起点
-direction = (-0.00031047366220460557, -0.033170954229671284, 0.9994496442550761)  # 方向向量
-length = 0.1  # 线的长度
+direction = (0.9490861110659287, -0.3150167515891047, 0.0)  # 水平方向向量
+length = 0.05  # 线的长度
 draw_line_with_arrow(start, direction, length, color=(0.0, 0.0, 1.0, 1.0), arrow_size=0.01)
+
+direction = (-0.07914687932413128, -0.23845463303717893, 0.9679231165109943)  # 垂轴线的方向向量
+length = 0.05  # 线的长度
+draw_line_with_arrow(start, direction, length, color=(1.0, 0.0, 0.0, 1.0), arrow_size=0.01)
+
+## 画出预抓取位置坐标系
+
+start = ( 0.4300645376426353, -0.014195258285587875, 0.1 )
+direction = (0.07914687932413128, 0.23845463303717893, -0.9679231165109943) # 末端z轴
+length = 0.05  # 线的长度
+draw_line_with_arrow(start, direction, length, color=(0.0, 0.0, 1.0, 1.0), arrow_size=0.01)
+
+direction = (0.9490861110659287, -0.3150167515891047, 0.0)  # 末端x轴
+length = 0.05  # 线的长度
+draw_line_with_arrow(start, direction, length, color=(1.0, 0.0, 0.0, 1.0), arrow_size=0.01)
+
+direction = (-0.3049119959512959, -0.9186423864602333, -0.25124657315801197)  # 末端y轴
+length = 0.05  # 线的长度
+draw_line_with_arrow(start, direction, length, color=(0.0, 1.0, 0.0, 1.0), arrow_size=0.01)
