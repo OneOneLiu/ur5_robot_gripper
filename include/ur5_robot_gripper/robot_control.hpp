@@ -6,14 +6,19 @@
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <geometry_msgs/msg/pose.hpp>
 #include "rclcpp_action/rclcpp_action.hpp"
-#include "ur5_robot_gripper/srv/print_pose.hpp"  // Header file for the custom service
-#include "ur5_robot_gripper/srv/move_to_position.hpp"
-#include "ur5_robot_gripper/action/move_to_position_action.hpp"  // 保持原有路径，改为 .hpp 文件
+#include "ur5_robot_gripper/srv/print_pose.hpp"  // Custom service for printing the pose
+#include "ur5_robot_gripper/srv/move_to_position.hpp"  // Custom service for moving to a position
+#include "ur5_robot_gripper/action/move_to_position_action.hpp"  // MoveToPosition action definition
+#include "ur5_robot_gripper/action/move_to_pose_action.hpp"  // MoveToPose action definition
 #include <iostream>
 
-// 定义 GoalHandleMoveToPosition 类型
+// Type definitions for MoveToPositionAction
 using MoveToPositionAction = ur5_robot_gripper::action::MoveToPositionAction;
 using GoalHandleMoveToPositionAction = rclcpp_action::ServerGoalHandle<MoveToPositionAction>;
+
+// Type definitions for MoveToPoseAction
+using MoveToPoseAction = ur5_robot_gripper::action::MoveToPoseAction;
+using GoalHandleMoveToPoseAction = rclcpp_action::ServerGoalHandle<MoveToPoseAction>;
 
 class RobotMover : public rclcpp::Node
 {
@@ -33,12 +38,14 @@ public:
 private:
     // Helper method to execute a motion plan
     void executePlan();
+
+    // Service callback functions
     void handlePrintRequest(const std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Request> /*request*/,
                           std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Response> response);
     void handleMovePositionRequest(const std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Request> request,
                                 std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Response> response);
     
-    // Action 部分
+    // Action for MoveToPosition
     rclcpp_action::Server<MoveToPositionAction>::SharedPtr action_server_;
     
     rclcpp_action::GoalResponse handleGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPositionAction::Goal> goal);
@@ -46,7 +53,15 @@ private:
     void handleAccepted(const std::shared_ptr<GoalHandleMoveToPositionAction> goal_handle);
     void executeGoal(const std::shared_ptr<GoalHandleMoveToPositionAction> goal_handle);
 
-    // 成员变量
+    // Action for MoveToPose
+    rclcpp_action::Server<MoveToPoseAction>::SharedPtr move_to_pose_action_server_;
+    
+    rclcpp_action::GoalResponse handlePoseGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPoseAction::Goal> goal);
+    rclcpp_action::CancelResponse handlePoseCancel(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle);
+    void handlePoseAccepted(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle);
+    void executePoseGoal(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle);
+
+    // Member variables
     rclcpp::Node::SharedPtr node_; // Additional ROS node pointer
     moveit::planning_interface::MoveGroupInterface move_group_interface_;  // MoveIt interface for controlling the arm
     rclcpp::Service<ur5_robot_gripper::srv::PrintPose>::SharedPtr print_current_pose_service_;  // Service pointer for pose requests

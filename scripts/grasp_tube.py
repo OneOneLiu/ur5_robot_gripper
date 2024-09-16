@@ -8,6 +8,7 @@ import time
 # action client
 from rclpy.action import ActionClient
 from ur5_robot_gripper.action import MoveToPositionAction
+from ur5_robot_gripper.action import MoveToPoseAction
 
 # tf2
 from tf2_ros import TransformException
@@ -16,7 +17,7 @@ from tf2_ros.transform_listener import TransformListener
 import tf2_geometry_msgs
 
 import numpy as np
-from transforms3d.quaternions import quat2mat
+from transforms3d.quaternions import quat2mat, mat2quat
 
 class PoseSubscriber(Node):
     def __init__(self):
@@ -35,6 +36,11 @@ class PoseSubscriber(Node):
         # 创建一个action client
         self._action_client = ActionClient(self, MoveToPositionAction, 'move_to_position_action')
         self.action_done = True
+        
+        # 创建一个action client
+        self._pose_client = ActionClient(self, MoveToPoseAction, 'move_to_pose_action')
+        self.pose_action_done = True
+        
         self.tube_index = 0
 
         # 创建一个tf2 listener
@@ -43,9 +49,9 @@ class PoseSubscriber(Node):
 
     def pose_callback(self, msg):
         # 如果姿态数组小于14，记录警告信息
-        if len(msg.poses) < 14:
-            self.get_logger().warn('Received PoseArray has less than 14 poses.')
-            return 0
+        # if len(msg.poses) < 14:
+        #     self.get_logger().warn('Received PoseArray has less than 14 poses.')
+        #     return 0
         self.pose_msg = msg
         self.get_logger().debug('Received and saved tube75 poses.')
         
@@ -55,41 +61,66 @@ class PoseSubscriber(Node):
             # calculate orientation
             q = [self.pose_msg.poses[self.tube_index].orientation.w, self.pose_msg.poses[self.tube_index].orientation.x, self.pose_msg.poses[self.tube_index].orientation.y, self.pose_msg.poses[self.tube_index].orientation.z]
             # 打印圆柱体中心位置
+            self.get_logger().warn("第{}个圆柱体".format(self.tube_index))
             self.get_logger().warn("圆柱体中心位置: {},{},{}".format(self.pose_msg.poses[self.tube_index].position.x, self.pose_msg.poses[self.tube_index].position.y, self.pose_msg.poses[self.tube_index].position.z))
             # 将四元数转换为旋转矩阵
             rotation_matrix = quat2mat(q)
             # 提取旋转矩阵的第三列作为圆柱体的Z轴
-            cylinder_z_axis = rotation_matrix[:, 2]
+            cylinder_y_axis = rotation_matrix[:, 1]
             # 打印圆柱体Z轴方向
-            self.get_logger().warn("圆柱体Z轴方向: {}, {}, {}".format(cylinder_z_axis[0], cylinder_z_axis[1], cylinder_z_axis[2]))
+            self.get_logger().warn("圆柱体Y轴方向: {}, {}, {}".format(cylinder_y_axis[0], cylinder_y_axis[1], cylinder_y_axis[2]))
             
             # 定义向上方向（假设沿着世界坐标系的Z轴）
             up_direction = np.array([0, 0, 1])
 
             # 第一次叉乘，得到与Z轴和向上方向垂直的水平向量
-            vector_horiz = np.cross(cylinder_z_axis, up_direction)
+            vector_horiz = np.cross(cylinder_y_axis, up_direction)
 
             # 检查是否为零向量
             if np.linalg.norm(vector_horiz) == 0:
                 # 如果为零，说明两个向量平行，选择另一个方向，例如X轴 # TODO: 思考为什么选择X轴
                 up_direction = np.array([1, 0, 0])
-                vector_horiz = np.cross(cylinder_z_axis, up_direction)
+                vector_horiz = np.cross(cylinder_y_axis, up_direction)
 
             # 归一化水平向量
             vector_horiz = vector_horiz / np.linalg.norm(vector_horiz)
             self.get_logger().warn("水平向量:{}, {}, {}".format(vector_horiz[0], vector_horiz[1], vector_horiz[2]))
 
             # 第二次叉乘，计算朝上边线的方向
-            result_vector = np.cross(vector_horiz, cylinder_z_axis)
+            result_vector = np.cross(vector_horiz, cylinder_y_axis)
 
             # 归一化结果向量
             result_vector = result_vector / np.linalg.norm(result_vector)
             self.get_logger().warn("朝上边线方向:{}, {}, {}".format(result_vector[0], result_vector[1], result_vector[2]))
+            
+            # 取朝上边线方向的反方向向量
+            opposite_vector = -result_vector
+            self.get_logger().warn("朝上边线反方向:{}, {}, {}".format(opposite_vector[0], opposite_vector[1], opposite_vector[2]))
+            # 将旋转矩阵转换为四元数
+            # 创建旋转矩阵，使用水平向量、圆柱体Y轴和反方向向量
+            rotation_matrix_opposite = np.column_stack((vector_horiz, -cylinder_y_axis, opposite_vector))
+            quaternion_opposite = mat2quat(rotation_matrix_opposite)
+            self.get_logger().warn("朝上边线反方向的四元数表示: w={}, x={}, y={}, z={}".format(
+                quaternion_opposite[0], quaternion_opposite[1], quaternion_opposite[2], quaternion_opposite[3]))
+            
+            # 获取圆柱体中心位置
+            cylinder_center = np.array([self.pose_msg.poses[self.tube_index].position.x, 
+                                        self.pose_msg.poses[self.tube_index].position.y, 
+                                        self.pose_msg.poses[self.tube_index].position.z])
 
-            self.send_action_goal([transformed_pose.position.x, transformed_pose.position.y, transformed_pose.position.z+0.2])
+            # 朝上边线方向的单位向量已经是 result_vector，因此我们可以直接乘以 0.3 得到新的点的位置偏移
+            offset = result_vector * 0.2
+
+            # 计算新的点的坐标
+            new_point = cylinder_center + offset
+
+            # 打印结果
+            self.get_logger().warn("沿着朝上边线方向0.2米的点坐标: {}, {}, {}".format(new_point[0], new_point[1], new_point[2]))
+
+            self.send_pose_goal((new_point[0], new_point[1], new_point[2]), quaternion_opposite)
             self.action_done = False
             self.tube_index += 1
-            if self.tube_index == 14:
+            if self.tube_index == len(self.pose_msg.poses):
                 self.tube_index = 0
 
             return 0
@@ -125,6 +156,50 @@ class PoseSubscriber(Node):
         self._get_result_future.add_done_callback(self.get_result_callback)
 
     def get_result_callback(self, future):
+        self.get_logger().info('Received Done signal :)')
+        result = future.result().result
+        self.get_logger().info('Result: {0}'.format(result))
+        if result.success:
+            self.get_logger().info('Goal succeeded!')
+            self.action_done = True
+    
+    ## 以下是第二个动作的代码
+    def send_pose_goal(self, position, quaternion):
+        '''
+        发送目标位置给action server
+        args:
+            position: 目标位置
+                px: position[0]
+                py: position[1]
+                pz: position[2]
+        '''
+        goal_msg = MoveToPoseAction.Goal()
+        goal_msg.px = position[0]
+        goal_msg.py = position[1]
+        goal_msg.pz = position[2]
+        goal_msg.qw = quaternion[0]
+        goal_msg.qx = quaternion[1]
+        goal_msg.qy = quaternion[2]
+        goal_msg.qz = quaternion[3]
+        
+        # Use the correct action client for pose
+        self._pose_client.wait_for_server()  # <-- Use the correct action client here
+        rclpy.logging.get_logger('send_action_goal').info('Found move to pose action server.')
+        self._send_goal_future = self._pose_client.send_goal_async(goal_msg)  # <-- Use _pose_client here
+        
+        self._send_goal_future.add_done_callback(self.pose_goal_response_callback)
+
+    def pose_goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('Goal rejected :(')
+            return
+
+        self.get_logger().info('Goal accepted :)')
+        self._get_result_future = goal_handle.get_result_async()
+        self._get_result_future.add_done_callback(self.get_pose_result_callback)
+
+    def get_pose_result_callback(self, future):
         self.get_logger().info('Received Done signal :)')
         result = future.result().result
         self.get_logger().info('Result: {0}'.format(result))

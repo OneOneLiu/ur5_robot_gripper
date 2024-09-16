@@ -24,6 +24,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/MoveToPosition.srv"
   "srv/PrintPose.srv"
   "action/MoveToPositionAction.action"
+  "action/MoveToPoseAction.action"
   DEPENDENCIES builtin_interfaces geometry_msgs action_msgs
 )
 

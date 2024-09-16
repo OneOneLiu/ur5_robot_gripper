@@ -1,0 +1,16 @@
+# MoveToPose.action
+
+# Request
+float64 px
+float64 py
+float64 pz
+float64 qx
+float64 qy
+float64 qz
+float64 qw
+---
+# Result
+bool success
+---
+# Feedback
+float64 percentage_complete

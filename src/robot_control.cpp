@@ -23,6 +23,15 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
       std::bind(&RobotMover::handleCancel, this, std::placeholders::_1),
       std::bind(&RobotMover::handleAccepted, this, std::placeholders::_1)
     );
+
+    // Create the action server for MoveToPoseAction
+    this->move_to_pose_action_server_ = rclcpp_action::create_server<MoveToPoseAction>(
+      this,
+      "move_to_pose_action",
+      std::bind(&RobotMover::handlePoseGoal, this, std::placeholders::_1, std::placeholders::_2),
+      std::bind(&RobotMover::handlePoseCancel, this, std::placeholders::_1),
+      std::bind(&RobotMover::handlePoseAccepted, this, std::placeholders::_1)
+    );
     
     // Add the node to the executor and start the executor thread
     executor_->add_node(node_);
@@ -55,6 +64,8 @@ void RobotMover::moveToPose(double px, double py, double pz, double qx, double q
   target_pose.orientation.y = qy;
   target_pose.orientation.z = qz;
   target_pose.orientation.w = qw;
+
+  RCLCPP_INFO(this->get_logger(), "Moving to pose (x=%.5f, y=%.5f, z=%.5f, qx=%.5f, qy=%.5f, qz=%.5f, qw=%.5f)", px, py, pz, qx, qy, qz, qw);
 
   move_group_interface_.setPoseTarget(target_pose);
   executePlan();
@@ -169,6 +180,60 @@ void RobotMover::executeGoal(const std::shared_ptr<GoalHandleMoveToPositionActio
     //     goal_handle->publish_feedback(feedback);
     //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     // }
+
+    result->success = true;
+    goal_handle->succeed(result);
+    RCLCPP_INFO(this->get_logger(), "Action goal completed successfully");
+}
+
+// Action goal handling function for MoveToPoseAction
+rclcpp_action::GoalResponse RobotMover::handlePoseGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPoseAction::Goal> goal)
+{
+    RCLCPP_INFO(this->get_logger(), "Received action goal to move to pose (x=%.2f, y=%.2f, z=%.2f, qx=%.2f, qy=%.2f, qz=%.2f, qw=%.2f)", 
+                goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw);
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
+// Action cancel handling function for MoveToPoseAction
+rclcpp_action::CancelResponse RobotMover::handlePoseCancel(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle)
+{
+    RCLCPP_INFO(this->get_logger(), "Received cancel request for move to pose");
+    return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+// Action accepted handling function for MoveToPoseAction
+void RobotMover::handlePoseAccepted(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle)
+{
+    std::thread([this, goal_handle]() {
+        executePoseGoal(goal_handle);
+    }).detach();
+}
+
+// Execute the goal and publish feedback
+void RobotMover::executePoseGoal(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle)
+{
+    RCLCPP_INFO(this->get_logger(), "Executing action goal...");
+
+    const auto goal = goal_handle->get_goal();
+    auto feedback = std::make_shared<MoveToPoseAction::Feedback>();
+    auto result = std::make_shared<MoveToPoseAction::Result>();
+
+    // 调用 moveToPose 而不是 moveToPosition
+    moveToPose(goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw);
+
+    // 这里可以插入一个模拟的运动执行进度反馈
+    for (int i = 0; i <= 100; ++i) {
+        if (goal_handle->is_canceling()) {
+            result->success = false;
+            goal_handle->canceled(result);
+            RCLCPP_INFO(this->get_logger(), "Action goal canceled");
+            return;
+        }
+
+        feedback->percentage_complete = i;
+        goal_handle->publish_feedback(feedback);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
 
     result->success = true;
     goal_handle->succeed(result);
