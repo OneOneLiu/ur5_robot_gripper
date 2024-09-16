@@ -4,7 +4,7 @@ from pxr import UsdGeom, Gf
 
 stage = omni.usd.get_context().get_stage()
 
-add_reference_to_stage("/catkin_ws/src/ur5_robot_gripper/meshes/tube75.usd", "/World/ur5_robot_gripper")
+add_reference_to_stage("/catkin_ws/src/ur5_robot_gripper/meshes/tube100.usd", "/World/ur5_robot_gripper")
 
 def set_object_transforms(object_prim_path, translation, rotation, scale):
         '''Set the object transforms
@@ -25,4 +25,4 @@ def set_object_transforms(object_prim_path, translation, rotation, scale):
 
         xformable.AddScaleOp().Set(Gf.Vec3f(scale))
 
-set_object_transforms("/World/ur5_robot_gripper", (0.5, 0.05, 0.05), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+set_object_transforms("/World/ur5_robot_gripper", (0.5, 0.05, 0.05), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))

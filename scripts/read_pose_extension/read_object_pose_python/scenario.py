@@ -93,9 +93,9 @@ class UR_Tube_Scenario:
         
         ## Load the tube racks
         self.load_usd_assets(prim_path="/World/rack/rack1", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
-        self.set_object_transforms("/World/rack/rack1", (0.4, 0.30, -0.002), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+        self.set_object_transforms("/World/rack/rack1", (0.6, 0.32, 0.065), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
         self.load_usd_assets(prim_path="/World/rack/rack2", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
-        self.set_object_transforms("/World/rack/rack2", (0.4, -0.38, -0.002), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+        self.set_object_transforms("/World/rack/rack2", (0.6, -0.40, 0.065), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
         
         ## Load the tubes
         tube75_asset_path = "{}/tube75/tube75.usd".format(self.assests_root_path)
@@ -105,21 +105,24 @@ class UR_Tube_Scenario:
                 rotation = (0.0, 0.0, 0.0)
                 if j:
                     rotation= (0.0, 0.0, 180.0)
-                self.set_object_transforms("/World/tube75/tube75_{}_{}".format(i,j), (0.5 +0.1*j, 0.05+0.025*j, 0.05+0.035*i), rotation, (1.0, 1.0, 1.0))
+                self.set_object_transforms("/World/tube75/tube75_{}_{}".format(i,j), (0.5 + 0.05*j, 0.05+0.035*j, 0.07+0.045*i), rotation, (0.001, 0.001, 0.001))
         
         tube100_asset_path = "{}/tube100/tube100.usd".format(self.assests_root_path)
         for i in range (7):
             for j in range(2):
                 self.load_usd_assets(prim_path="/World/tube100/tube100_{}_{}".format(i,j), usd_path=tube100_asset_path)
-                self.set_object_transforms("/World/tube100/tube100_{}_{}".format(i,j), (0.52 + 0.1*j,  0.05+0.025*j, 0.05+0.035*i), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+                rotation = (0.0, 0.0, 0.0)
+                if j:
+                    rotation= (0.0, 0.0, 180.0)
+                self.set_object_transforms("/World/tube100/tube100_{}_{}".format(i,j), (0.55 + 0.05*j,  0.05+0.035*j, 0.07+0.045*i), rotation, (0.001, 0.001, 0.001))
         
         # Load demo tubes
         for i in range (4):
             self.load_usd_assets(prim_path="/World/tube75/tube75_demo_{}".format(i), usd_path=tube75_asset_path)
-            self.set_object_transforms("/World/tube75/tube75_demo_{}".format(i), (0.4+0.013+0.016*14, -0.38+0.022+0.016*i, 0.12), (90.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+            self.set_object_transforms("/World/tube75/tube75_demo_{}".format(i), (0.6, -0.40+0.016*i, 0.05), (90.0, 0.0, 0.0), (0.001, 0.001, 0.001))
         for i in range (4):
             self.load_usd_assets(prim_path="/World/tube100/tube100_demo_{}".format(i), usd_path=tube100_asset_path)
-            self.set_object_transforms("/World/tube100/tube100_demo_{}".format(i), (0.4+0.013+0.016*14, 0.3+0.022+0.016*i, 0.12), (90.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+            self.set_object_transforms("/World/tube100/tube100_demo_{}".format(i), (0.6, 0.32+0.016*i, 0.07), (90.0, 0.0, 0.0), (0.001, 0.001, 0.001))
         
         # Add camera
         self.add_camera("/Camera/Camera1", (1.3, 0.35, 1.3), (30.0, 10.0, 95.0))
@@ -295,7 +298,7 @@ class UR_Tube_Scenario:
         for i in range(horizon):
             for j in range(vertical):
                 # tube75
-                prim_path_75 = f"/World/tube75/tube75_{i}_{j}/tube75/tube75"
+                prim_path_75 = f"/World/tube75/tube75_{i}_{j}/tube75"
                 translation_75, orientation_75 = self.get_object_pose(prim_path_75, output = False)
                 pose = Pose()
                 pose.position.x = translation_75[0]
