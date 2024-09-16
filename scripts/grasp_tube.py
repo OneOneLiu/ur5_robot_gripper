@@ -57,73 +57,88 @@ class PoseSubscriber(Node):
         
         # 如果动作已经完成，执行下一个动作
         if self.action_done:
-            transformed_pose = self.transform_pose(self.pose_msg.poses[self.tube_index], 'isaac_world', 'base_link')
-            # calculate orientation
-            q = [self.pose_msg.poses[self.tube_index].orientation.w, self.pose_msg.poses[self.tube_index].orientation.x, self.pose_msg.poses[self.tube_index].orientation.y, self.pose_msg.poses[self.tube_index].orientation.z]
-            # 打印圆柱体中心位置
-            self.get_logger().warn("第{}个圆柱体".format(self.tube_index))
-            self.get_logger().warn("圆柱体中心位置: {},{},{}".format(self.pose_msg.poses[self.tube_index].position.x, self.pose_msg.poses[self.tube_index].position.y, self.pose_msg.poses[self.tube_index].position.z))
-            # 将四元数转换为旋转矩阵
-            rotation_matrix = quat2mat(q)
-            # 提取旋转矩阵的第三列作为圆柱体的Z轴
-            cylinder_y_axis = rotation_matrix[:, 1]
-            # 打印圆柱体Z轴方向
-            self.get_logger().warn("圆柱体Y轴方向: {}, {}, {}".format(cylinder_y_axis[0], cylinder_y_axis[1], cylinder_y_axis[2]))
+            grasping_point, quaternion_opposite = self.cal_grasping_pose(self.pose_msg.poses[self.tube_index])
             
-            # 定义向上方向（假设沿着世界坐标系的Z轴）
-            up_direction = np.array([0, 0, 1])
-
-            # 第一次叉乘，得到与Z轴和向上方向垂直的水平向量
-            vector_horiz = np.cross(cylinder_y_axis, up_direction)
-
-            # 检查是否为零向量
-            if np.linalg.norm(vector_horiz) == 0:
-                # 如果为零，说明两个向量平行，选择另一个方向，例如X轴 # TODO: 思考为什么选择X轴
-                up_direction = np.array([1, 0, 0])
-                vector_horiz = np.cross(cylinder_y_axis, up_direction)
-
-            # 归一化水平向量
-            vector_horiz = vector_horiz / np.linalg.norm(vector_horiz)
-            self.get_logger().warn("水平向量:{}, {}, {}".format(vector_horiz[0], vector_horiz[1], vector_horiz[2]))
-
-            # 第二次叉乘，计算朝上边线的方向
-            result_vector = np.cross(vector_horiz, cylinder_y_axis)
-
-            # 归一化结果向量
-            result_vector = result_vector / np.linalg.norm(result_vector)
-            self.get_logger().warn("朝上边线方向:{}, {}, {}".format(result_vector[0], result_vector[1], result_vector[2]))
+            grasping_pose = Pose()
+            grasping_pose.position.x = grasping_point[0]
+            grasping_pose.position.y = grasping_point[1]
+            grasping_pose.position.z = grasping_point[2]
+            grasping_pose.orientation.w = quaternion_opposite[0]
+            grasping_pose.orientation.x = quaternion_opposite[1]
+            grasping_pose.orientation.y = quaternion_opposite[2]
+            grasping_pose.orientation.z = quaternion_opposite[3]
             
-            # 取朝上边线方向的反方向向量
-            opposite_vector = -result_vector
-            self.get_logger().warn("朝上边线反方向:{}, {}, {}".format(opposite_vector[0], opposite_vector[1], opposite_vector[2]))
-            # 将旋转矩阵转换为四元数
-            # 创建旋转矩阵，使用水平向量、圆柱体Y轴和反方向向量
-            rotation_matrix_opposite = np.column_stack((vector_horiz, -cylinder_y_axis, opposite_vector))
-            quaternion_opposite = mat2quat(rotation_matrix_opposite)
-            self.get_logger().warn("朝上边线反方向的四元数表示: w={}, x={}, y={}, z={}".format(
-                quaternion_opposite[0], quaternion_opposite[1], quaternion_opposite[2], quaternion_opposite[3]))
+            transformed_pose = self.transform_pose(grasping_pose, 'isaac_world', 'world')
             
-            # 获取圆柱体中心位置
-            cylinder_center = np.array([self.pose_msg.poses[self.tube_index].position.x, 
-                                        self.pose_msg.poses[self.tube_index].position.y, 
-                                        self.pose_msg.poses[self.tube_index].position.z])
-
-            # 朝上边线方向的单位向量已经是 result_vector，因此我们可以直接乘以 0.3 得到新的点的位置偏移
-            offset = result_vector * 0.2
-
-            # 计算新的点的坐标
-            new_point = cylinder_center + offset
-
-            # 打印结果
-            self.get_logger().warn("沿着朝上边线方向0.2米的点坐标: {}, {}, {}".format(new_point[0], new_point[1], new_point[2]))
-
-            self.send_pose_goal((new_point[0], new_point[1], new_point[2]), quaternion_opposite)
+            self.send_pose_goal((transformed_pose.position.x, transformed_pose.position.y, transformed_pose.position.z), (transformed_pose.orientation.w, transformed_pose.orientation.x, transformed_pose.orientation.y, transformed_pose.orientation.z))
+            
             self.action_done = False
             self.tube_index += 1
             if self.tube_index == len(self.pose_msg.poses):
                 self.tube_index = 0
 
             return 0
+    def cal_grasping_pose(self, pose, visual=False):
+        # calculate orientation
+        q = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
+        # 打印圆柱体中心位置
+        self.get_logger().warn("第{}个圆柱体".format(self.tube_index))
+        self.get_logger().warn("圆柱体中心位置: {},{},{}".format(pose.position.x, pose.position.y, pose.position.z))
+        # 将四元数转换为旋转矩阵
+        rotation_matrix = quat2mat(q)
+        # 提取旋转矩阵的第三列作为圆柱体的Z轴
+        cylinder_y_axis = rotation_matrix[:, 1]
+        # 打印圆柱体Z轴方向
+        self.get_logger().warn("圆柱体Y轴方向: {}, {}, {}".format(cylinder_y_axis[0], cylinder_y_axis[1], cylinder_y_axis[2]))
+        
+        # 定义向上方向（假设沿着世界坐标系的Z轴）
+        up_direction = np.array([0, 0, 1])
+
+        # 第一次叉乘，得到与Z轴和向上方向垂直的水平向量
+        vector_horiz = np.cross(cylinder_y_axis, up_direction)
+
+        # 检查是否为零向量
+        if np.linalg.norm(vector_horiz) == 0:
+            # 如果为零，说明两个向量平行，选择另一个方向，例如X轴 # TODO: 思考为什么选择X轴
+            up_direction = np.array([1, 0, 0])
+            vector_horiz = np.cross(cylinder_y_axis, up_direction)
+
+        # 归一化水平向量
+        vector_horiz = vector_horiz / np.linalg.norm(vector_horiz)
+        self.get_logger().warn("水平向量:{}, {}, {}".format(vector_horiz[0], vector_horiz[1], vector_horiz[2]))
+
+        # 第二次叉乘，计算朝上边线的方向
+        result_vector = np.cross(vector_horiz, cylinder_y_axis)
+
+        # 归一化结果向量
+        result_vector = result_vector / np.linalg.norm(result_vector)
+        self.get_logger().warn("朝上边线方向:{}, {}, {}".format(result_vector[0], result_vector[1], result_vector[2]))
+        
+        # 取朝上边线方向的反方向向量
+        opposite_vector = -result_vector
+        self.get_logger().warn("朝上边线反方向:{}, {}, {}".format(opposite_vector[0], opposite_vector[1], opposite_vector[2]))
+        # 将旋转矩阵转换为四元数
+        # 创建旋转矩阵，使用水平向量、圆柱体Y轴和反方向向量
+        rotation_matrix_opposite = np.column_stack((vector_horiz, -cylinder_y_axis, opposite_vector))
+        quaternion_opposite = mat2quat(rotation_matrix_opposite)
+        self.get_logger().warn("朝上边线反方向的四元数表示: w={}, x={}, y={}, z={}".format(
+            quaternion_opposite[0], quaternion_opposite[1], quaternion_opposite[2], quaternion_opposite[3]))
+        
+        # 获取圆柱体中心位置
+        cylinder_center = np.array([pose.position.x, 
+                                    pose.position.y, 
+                                    pose.position.z])
+
+        # 朝上边线方向的单位向量已经是 result_vector，因此我们可以直接乘以 0.3 得到新的点的位置偏移
+        offset = result_vector * 0.2
+
+        # 计算新的点的坐标
+        new_point = cylinder_center + offset
+
+        # 打印结果
+        self.get_logger().warn("沿着朝上边线方向0.2米的点坐标: {}, {}, {}".format(new_point[0], new_point[1], new_point[2]))
+        
+        return new_point, quaternion_opposite
 
     def send_action_goal(self, position):
         '''
@@ -206,7 +221,7 @@ class PoseSubscriber(Node):
         if result.success:
             self.get_logger().info('Goal succeeded!')
             self.action_done = True
-    
+    # 0.04448324946468698 0.500871617282540 0.203080912841937 -0.7384061506328169 0.6742365663375028 0.008566662551181606 0.00938198346694515
     def transform_pose(self, pose, source_frame, target_frame):
         while True:
             # wait for transform buffer to be filled
