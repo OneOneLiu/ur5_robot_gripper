@@ -56,7 +56,8 @@ class PoseSubscriber(Node):
         self.get_logger().debug('Received and saved tube75 poses.')
         
         # 如果动作已经完成，执行下一个动作
-        if self.action_done:
+        if self.pose_action_done:
+            rclpy.logging.get_logger('pose_callback').warn('action done, action server is ready for next goal')
             grasping_point, quaternion_opposite = self.cal_grasping_pose(self.pose_msg.poses[self.tube_index])
             
             grasping_pose = Pose()
@@ -72,12 +73,16 @@ class PoseSubscriber(Node):
             
             self.send_pose_goal((transformed_pose.position.x, transformed_pose.position.y, transformed_pose.position.z), (transformed_pose.orientation.w, transformed_pose.orientation.x, transformed_pose.orientation.y, transformed_pose.orientation.z))
             
-            self.action_done = False
+            self.pose_action_done = False
             self.tube_index += 1
             if self.tube_index == len(self.pose_msg.poses):
                 self.tube_index = 0
+        else:
+            rclpy.logging.get_logger('pose_callback').warn('action is not done, waiting for action server to be ready')
+            # sleep for 0.5 seconds
+            time.sleep(0.5)
+        return 0
 
-            return 0
     def cal_grasping_pose(self, pose, visual=False):
         # calculate orientation
         q = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
@@ -129,14 +134,14 @@ class PoseSubscriber(Node):
                                     pose.position.y, 
                                     pose.position.z])
 
-        # 朝上边线方向的单位向量已经是 result_vector，因此我们可以直接乘以 0.3 得到新的点的位置偏移
-        offset = result_vector * 0.2
+        # 朝上边线方向的单位向量已经是 result_vector，因此我们可以直接乘以 0.05 得到新的点的位置偏移
+        offset = result_vector * 0.05
 
         # 计算新的点的坐标
         new_point = cylinder_center + offset
 
         # 打印结果
-        self.get_logger().warn("沿着朝上边线方向0.2米的点坐标: {}, {}, {}".format(new_point[0], new_point[1], new_point[2]))
+        self.get_logger().warn("沿着朝上边线方向0.05米的点坐标: {}, {}, {}".format(new_point[0], new_point[1], new_point[2]))
         
         return new_point, quaternion_opposite
 
@@ -220,8 +225,8 @@ class PoseSubscriber(Node):
         self.get_logger().info('Result: {0}'.format(result))
         if result.success:
             self.get_logger().info('Goal succeeded!')
-            self.action_done = True
-    # 0.04448324946468698 0.500871617282540 0.203080912841937 -0.7384061506328169 0.6742365663375028 0.008566662551181606 0.00938198346694515
+            self.pose_action_done = True
+ 
     def transform_pose(self, pose, source_frame, target_frame):
         while True:
             # wait for transform buffer to be filled

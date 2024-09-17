@@ -65,7 +65,7 @@ void RobotMover::moveToPose(double px, double py, double pz, double qx, double q
   target_pose.orientation.z = qz;
   target_pose.orientation.w = qw;
 
-  RCLCPP_INFO(this->get_logger(), "Moving to pose (x=%.5f, y=%.5f, z=%.5f, qx=%.5f, qy=%.5f, qz=%.5f, qw=%.5f)", px, py, pz, qx, qy, qz, qw);
+  RCLCPP_INFO(this->get_logger(), "Moving to pose (x=%.8f, y=%.8f, z=%.8f, qx=%.8f, qy=%.8f, qz=%.8f, qw=%.8f)", px, py, pz, qx, qy, qz, qw);
 
   move_group_interface_.setPoseTarget(target_pose);
   executePlan();
@@ -91,13 +91,13 @@ void RobotMover::moveToPosition(double px, double py, double pz)
                 current_pose.orientation.x, current_pose.orientation.y, current_pose.orientation.z, current_pose.orientation.w);
 
   move_group_interface_.setPoseTarget(current_pose);
-  move_group_interface_.setGoalOrientationTolerance(0.015); // Radians, adjust as needed
-  move_group_interface_.setGoalPositionTolerance(0.001); // Meters, adjust as needed
   executePlan();
 }
 
 void RobotMover::executePlan()
 {
+  move_group_interface_.setGoalOrientationTolerance(0.0001); // Radians, adjust as needed
+  move_group_interface_.setGoalPositionTolerance(0.0001); // Meters, adjust as needed
   auto const [success, plan] = [&]{
     moveit::planning_interface::MoveGroupInterface::Plan msg;
     auto const ok = static_cast<bool>(move_group_interface_.plan(msg));
@@ -189,7 +189,7 @@ void RobotMover::executeGoal(const std::shared_ptr<GoalHandleMoveToPositionActio
 // Action goal handling function for MoveToPoseAction
 rclcpp_action::GoalResponse RobotMover::handlePoseGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPoseAction::Goal> goal)
 {
-    RCLCPP_INFO(this->get_logger(), "Received action goal to move to pose (x=%.2f, y=%.2f, z=%.2f, qx=%.2f, qy=%.2f, qz=%.2f, qw=%.2f)", 
+    RCLCPP_INFO(this->get_logger(), "Received action goal to move to pose (x=%.8f, y=%.8f, z=%.8f, qx=%.8f, qy=%.8f, qz=%.8f, qw=%.8f)", 
                 goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw);
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -220,20 +220,6 @@ void RobotMover::executePoseGoal(const std::shared_ptr<GoalHandleMoveToPoseActio
 
     // 调用 moveToPose 而不是 moveToPosition
     moveToPose(goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw);
-
-    // 这里可以插入一个模拟的运动执行进度反馈
-    for (int i = 0; i <= 100; ++i) {
-        if (goal_handle->is_canceling()) {
-            result->success = false;
-            goal_handle->canceled(result);
-            RCLCPP_INFO(this->get_logger(), "Action goal canceled");
-            return;
-        }
-
-        feedback->percentage_complete = i;
-        goal_handle->publish_feedback(feedback);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
 
     result->success = true;
     goal_handle->succeed(result);
