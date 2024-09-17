@@ -66,7 +66,7 @@ class UR_Tube_Scenario:
         
         # # Set the horizon and vertical for tube numbers
         self.horizon = 4
-        self.vertical = 1
+        self.vertical = 3
 
     def load_example_assets(self):
         """Load assets onto the stage and return them so they can be registered with the
