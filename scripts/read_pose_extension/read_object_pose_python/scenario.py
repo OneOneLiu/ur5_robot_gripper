@@ -65,8 +65,8 @@ class UR_Tube_Scenario:
         self.pub_thread = threading.Thread(target=self.pub_tube_poses)
         
         # # Set the horizon and vertical for tube numbers
-        self.horizon = 4
-        self.vertical = 3
+        self.horizon = 5
+        self.vertical = 1
 
     def load_example_assets(self):
         """Load assets onto the stage and return them so they can be registered with the
@@ -97,9 +97,9 @@ class UR_Tube_Scenario:
         
         ## Load the tube racks
         self.load_usd_assets(prim_path="/World/rack/rack1", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
-        self.set_object_transforms("/World/rack/rack1", (0.6, 0.32, 0.065), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
+        self.set_object_transforms("/World/rack/rack1", (0.6, 0.32, 0.08), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
         self.load_usd_assets(prim_path="/World/rack/rack2", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
-        self.set_object_transforms("/World/rack/rack2", (0.6, -0.40, 0.065), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
+        self.set_object_transforms("/World/rack/rack2", (0.6, -0.40, 0.08), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
         
         ## Load the tubes
         tube75_asset_path = "{}/tube75/tube75.usd".format(self.assests_root_path)
@@ -112,13 +112,13 @@ class UR_Tube_Scenario:
                 self.set_object_transforms("/World/tube75/tube75_{}_{}".format(i,j), (0.5 + 0.05*j, 0.05+0.035*j, 0.07+0.045*i), rotation, (0.001, 0.001, 0.001))
         
         tube100_asset_path = "{}/tube100/tube100.usd".format(self.assests_root_path)
-        for i in range (self.horizon):
-            for j in range(self.vertical):
-                self.load_usd_assets(prim_path="/World/tube100/tube100_{}_{}".format(i,j), usd_path=tube100_asset_path)
-                rotation = (0.0, 0.0, 0.0)
-                if j:
-                    rotation= (0.0, 0.0, 180.0)
-                self.set_object_transforms("/World/tube100/tube100_{}_{}".format(i,j), (0.55 + 0.05*j,  0.05+0.035*j, 0.07+0.045*i), rotation, (0.001, 0.001, 0.001))
+        # for i in range (self.horizon):
+        #     for j in range(self.vertical):
+        #         self.load_usd_assets(prim_path="/World/tube100/tube100_{}_{}".format(i,j), usd_path=tube100_asset_path)
+        #         rotation = (0.0, 0.0, 0.0)
+        #         if j:
+        #             rotation= (0.0, 0.0, 180.0)
+        #         self.set_object_transforms("/World/tube100/tube100_{}_{}".format(i,j), (0.55 + 0.05*j,  0.05+0.035*j, 0.07+0.045*i), rotation, (0.001, 0.001, 0.001))
         
         # Load demo tubes
         for i in range (4):
