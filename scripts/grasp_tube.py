@@ -58,20 +58,19 @@ class PoseSubscriber(Node):
         # 如果动作已经完成，执行下一个动作
         if self.pose_action_done:
             rclpy.logging.get_logger('pose_callback').warn('action done, action server is ready for next goal')
-            grasping_point, quaternion_opposite = self.cal_grasping_pose(self.pose_msg.poses[self.tube_index])
+            pre_grasp_point, grasping_point, quaternion_opposite = self.cal_grasping_pose(self.pose_msg.poses[self.tube_index])
             
-            grasping_pose = Pose()
-            grasping_pose.position.x = grasping_point[0]
-            grasping_pose.position.y = grasping_point[1]
-            grasping_pose.position.z = grasping_point[2]
-            grasping_pose.orientation.w = quaternion_opposite[0]
-            grasping_pose.orientation.x = quaternion_opposite[1]
-            grasping_pose.orientation.y = quaternion_opposite[2]
-            grasping_pose.orientation.z = quaternion_opposite[3]
+            pre_grasp_pose = self.construct_pose(pre_grasp_point, quaternion_opposite)
+            grasping_pose = self.construct_pose(grasping_point, quaternion_opposite)
             
-            transformed_pose = self.transform_pose(grasping_pose, 'isaac_world', 'world')
+            transformed_pre_grasp_pose = self.transform_pose(pre_grasp_pose, 'isaac_world', 'world')
+            transformed_grasp_pose = self.transform_pose(grasping_pose, 'isaac_world', 'world')
             
-            self.send_pose_goal((transformed_pose.position.x, transformed_pose.position.y, transformed_pose.position.z), (transformed_pose.orientation.w, transformed_pose.orientation.x, transformed_pose.orientation.y, transformed_pose.orientation.z))
+            self.send_pose_goal((transformed_pre_grasp_pose.position.x, transformed_pre_grasp_pose.position.y, transformed_pre_grasp_pose.position.z), (transformed_pre_grasp_pose.orientation.w, transformed_pre_grasp_pose.orientation.x, transformed_pre_grasp_pose.orientation.y, transformed_pre_grasp_pose.orientation.z))
+            
+            self.pose_action_done = False
+            
+            self.send_pose_goal((transformed_grasp_pose.position.x, transformed_grasp_pose.position.y, transformed_grasp_pose.position.z), (transformed_grasp_pose.orientation.w, transformed_grasp_pose.orientation.x, transformed_grasp_pose.orientation.y, transformed_grasp_pose.orientation.z))
             
             self.pose_action_done = False
             self.tube_index += 1
@@ -82,6 +81,17 @@ class PoseSubscriber(Node):
             # sleep for 0.5 seconds
             time.sleep(0.5)
         return 0
+    def construct_pose(self, position, quaternion):
+        pose = Pose()
+        pose.position.x = position[0]
+        pose.position.y = position[1]
+        pose.position.z = position[2]
+        pose.orientation.w = quaternion[0]
+        pose.orientation.x = quaternion[1]
+        pose.orientation.y = quaternion[2]
+        pose.orientation.z = quaternion[3]
+        
+        return pose
 
     def cal_grasping_pose(self, pose, visual=False):
         # calculate orientation
@@ -135,15 +145,19 @@ class PoseSubscriber(Node):
                                     pose.position.z])
 
         # 朝上边线方向的单位向量已经是 result_vector，因此我们可以直接乘以 0.05 得到新的点的位置偏移
-        offset = result_vector * 0.05
-
+        offset = result_vector * 0.1 + cylinder_y_axis * 0.03
         # 计算新的点的坐标
-        new_point = cylinder_center + offset
+        pre_grasp_point = cylinder_center + offset
+
+        # 抓取圆柱体中心
+        offset = result_vector * 0.05 + cylinder_y_axis * 0.03
+        # 计算新的点的坐标
+        grasp_point = cylinder_center + offset
 
         # 打印结果
-        self.get_logger().warn("沿着朝上边线方向0.05米的点坐标: {}, {}, {}".format(new_point[0], new_point[1], new_point[2]))
+        # self.get_logger().warn("沿着朝上边线方向0.05米的点坐标: {}, {}, {}".format(new_point[0], new_point[1], new_point[2]))
         
-        return new_point, quaternion_opposite
+        return pre_grasp_point, grasp_point, quaternion_opposite
 
     def send_action_goal(self, position):
         '''
