@@ -98,6 +98,10 @@ void RobotMover::executePlan()
 {
   move_group_interface_.setGoalOrientationTolerance(0.0001); // Radians, adjust as needed
   move_group_interface_.setGoalPositionTolerance(0.0001); // Meters, adjust as needed
+
+  // 设置速度和加速度的缩放因子
+  move_group_interface_.setMaxVelocityScalingFactor(0.05); // 将速度缩放因子设置为30%
+  move_group_interface_.setMaxAccelerationScalingFactor(0.05); // 将加速度缩放因子设置为30%
   auto const [success, plan] = [&]{
     moveit::planning_interface::MoveGroupInterface::Plan msg;
     auto const ok = static_cast<bool>(move_group_interface_.plan(msg));
