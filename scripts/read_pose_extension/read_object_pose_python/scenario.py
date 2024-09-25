@@ -80,15 +80,15 @@ class UR_Tube_Scenario:
         # Open USD assets
         omni.usd.get_context().open_stage("{}/simple_room/simple_room.usd".format(self.assests_root_path))
         self.stage = omni.usd.get_context().get_stage()
-        # # load URDF assets
-        # results, self.robot_prim_path = self.load_urdf_assets(root_path = "/catkin_ws/src/ur5_robot_gripper/urdf/ur_description", file_name = "ur5.urdf")
-        # # Set up the robot joint mimic
-        # left_knuckle_joint_path = self.robot_prim_path + "/robotiq_85_base_link/robotiq_85_left_knuckle_joint"
-        # left_inner_knuckle_joint_path = self.robot_prim_path + "/robotiq_85_base_link/robotiq_85_left_inner_knuckle_joint"
-        # left_finger_tip_joint_path = self.robot_prim_path + "/robotiq_85_left_inner_knuckle_link/robotiq_85_left_finger_tip_joint"
+        # load URDF assets
+        results, self.robot_prim_path = self.load_urdf_assets(root_path = "/catkin_ws/src/ur5_robot_gripper/urdf/ur_description", file_name = "ur5.urdf")
+        # Set up the robot joint mimic
+        left_knuckle_joint_path = self.robot_prim_path + "/robotiq_85_base_link/robotiq_85_left_knuckle_joint"
+        left_inner_knuckle_joint_path = self.robot_prim_path + "/robotiq_85_base_link/robotiq_85_left_inner_knuckle_joint"
+        left_finger_tip_joint_path = self.robot_prim_path + "/robotiq_85_left_inner_knuckle_link/robotiq_85_left_finger_tip_joint"
 
-        # self.set_mimic_joints(left_inner_knuckle_joint_path, left_knuckle_joint_path, gearing = -1.0, offset = 0.0)
-        # self.set_mimic_joints(left_finger_tip_joint_path, left_knuckle_joint_path, gearing = 1.0, offset = 0.0)
+        self.set_mimic_joints(left_inner_knuckle_joint_path, left_knuckle_joint_path, gearing = -1.0, offset = 0.0)
+        self.set_mimic_joints(left_finger_tip_joint_path, left_knuckle_joint_path, gearing = 1.0, offset = 0.0)
         
         # Load Usd assets
         ## Load the tray
