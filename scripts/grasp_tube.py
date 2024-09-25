@@ -36,6 +36,7 @@ class PoseSubscriber(Node):
         # 创建一个action client
         self._action_client = ActionClient(self, MoveToPositionAction, 'move_to_position_action')
         self.action_done = True
+        self.pre_action = "grasp"
         
         # 创建一个action client
         self._pose_client = ActionClient(self, MoveToPoseAction, 'move_to_pose_action')
@@ -58,28 +59,35 @@ class PoseSubscriber(Node):
         # 如果动作已经完成，执行下一个动作
         if self.pose_action_done:
             rclpy.logging.get_logger('pose_callback').warn('action done, action server is ready for next goal')
+            # Calculate the pre-grasp and grasp poses
             pre_grasp_point, grasping_point, quaternion_opposite = self.cal_grasping_pose(self.pose_msg.poses[self.tube_index])
-            
+                
             pre_grasp_pose = self.construct_pose(pre_grasp_point, quaternion_opposite)
             grasping_pose = self.construct_pose(grasping_point, quaternion_opposite)
             
             transformed_pre_grasp_pose = self.transform_pose(pre_grasp_pose, 'isaac_world', 'world')
             transformed_grasp_pose = self.transform_pose(grasping_pose, 'isaac_world', 'world')
-            
-            self.send_pose_goal((transformed_pre_grasp_pose.position.x, transformed_pre_grasp_pose.position.y, transformed_pre_grasp_pose.position.z), (transformed_pre_grasp_pose.orientation.w, transformed_pre_grasp_pose.orientation.x, transformed_pre_grasp_pose.orientation.y, transformed_pre_grasp_pose.orientation.z))
-            
-            self.pose_action_done = False
-            
-            self.send_pose_goal((transformed_grasp_pose.position.x, transformed_grasp_pose.position.y, transformed_grasp_pose.position.z), (transformed_grasp_pose.orientation.w, transformed_grasp_pose.orientation.x, transformed_grasp_pose.orientation.y, transformed_grasp_pose.orientation.z))
-            
-            self.pose_action_done = False
-            self.tube_index += 1
-            if self.tube_index == len(self.pose_msg.poses):
-                self.tube_index = 0
+            if self.pre_action == "grasp":
+                self.send_pose_goal((transformed_pre_grasp_pose.position.x, transformed_pre_grasp_pose.position.y, transformed_pre_grasp_pose.position.z), (transformed_pre_grasp_pose.orientation.w, transformed_pre_grasp_pose.orientation.x, transformed_pre_grasp_pose.orientation.y, transformed_pre_grasp_pose.orientation.z))
+                rclpy.logging.get_logger('pose_callback').warn('Finished sending pre-grasp goal')
+                self.pose_action_done = False
+                self.pre_action = "pre_grasp"
+                rclpy.logging.get_logger('pose_callback').warn('action is not done, waiting for action server to be ready')
+            else:
+                self.send_pose_goal((transformed_grasp_pose.position.x, transformed_grasp_pose.position.y, transformed_grasp_pose.position.z), (transformed_grasp_pose.orientation.w, transformed_grasp_pose.orientation.x, transformed_grasp_pose.orientation.y, transformed_grasp_pose.orientation.z))
+                rclpy.logging.get_logger('pose_callback').warn('Finished sending grasp goal')
+                self.pose_action_done = False
+                self.pre_action = "grasp"
+                # 只有当两个动作都完成时，才能更新tube index到下一个动作
+                self.tube_index += 1
+                if self.tube_index == len(self.pose_msg.poses):
+                    self.tube_index = 0
+                rclpy.logging.get_logger('pose_callback').warn('action is not done, waiting for action server to be ready')
         else:
-            rclpy.logging.get_logger('pose_callback').warn('action is not done, waiting for action server to be ready')
+            # rclpy.logging.get_logger('pose_callback').warn('action is not done, waiting for action server to be ready')
             # sleep for 0.5 seconds
-            time.sleep(0.5)
+            # time.sleep(0.5)
+            pass
         return 0
     def construct_pose(self, position, quaternion):
         pose = Pose()
@@ -98,13 +106,13 @@ class PoseSubscriber(Node):
         q = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
         # 打印圆柱体中心位置
         self.get_logger().warn("第{}个圆柱体".format(self.tube_index))
-        self.get_logger().warn("圆柱体中心位置: {},{},{}".format(pose.position.x, pose.position.y, pose.position.z))
+        # self.get_logger().warn("圆柱体中心位置: {},{},{}".format(pose.position.x, pose.position.y, pose.position.z))
         # 将四元数转换为旋转矩阵
         rotation_matrix = quat2mat(q)
         # 提取旋转矩阵的第三列作为圆柱体的Z轴
         cylinder_y_axis = rotation_matrix[:, 1]
         # 打印圆柱体Z轴方向
-        self.get_logger().warn("圆柱体Y轴方向: {}, {}, {}".format(cylinder_y_axis[0], cylinder_y_axis[1], cylinder_y_axis[2]))
+        # self.get_logger().warn("圆柱体Y轴方向: {}, {}, {}".format(cylinder_y_axis[0], cylinder_y_axis[1], cylinder_y_axis[2]))
         
         # 定义向上方向（假设沿着世界坐标系的Z轴）
         up_direction = np.array([0, 0, 1])
@@ -120,24 +128,24 @@ class PoseSubscriber(Node):
 
         # 归一化水平向量
         vector_horiz = vector_horiz / np.linalg.norm(vector_horiz)
-        self.get_logger().warn("水平向量:{}, {}, {}".format(vector_horiz[0], vector_horiz[1], vector_horiz[2]))
+        # self.get_logger().warn("水平向量:{}, {}, {}".format(vector_horiz[0], vector_horiz[1], vector_horiz[2]))
 
         # 第二次叉乘，计算朝上边线的方向
         result_vector = np.cross(vector_horiz, cylinder_y_axis)
 
         # 归一化结果向量
         result_vector = result_vector / np.linalg.norm(result_vector)
-        self.get_logger().warn("朝上边线方向:{}, {}, {}".format(result_vector[0], result_vector[1], result_vector[2]))
+        # self.get_logger().warn("朝上边线方向:{}, {}, {}".format(result_vector[0], result_vector[1], result_vector[2]))
         
         # 取朝上边线方向的反方向向量
         opposite_vector = -result_vector
-        self.get_logger().warn("朝上边线反方向:{}, {}, {}".format(opposite_vector[0], opposite_vector[1], opposite_vector[2]))
+        # self.get_logger().warn("朝上边线反方向:{}, {}, {}".format(opposite_vector[0], opposite_vector[1], opposite_vector[2]))
         # 将旋转矩阵转换为四元数
         # 创建旋转矩阵，使用水平向量、圆柱体Y轴和反方向向量
         rotation_matrix_opposite = np.column_stack((vector_horiz, -cylinder_y_axis, opposite_vector))
         quaternion_opposite = mat2quat(rotation_matrix_opposite)
-        self.get_logger().warn("朝上边线反方向的四元数表示: w={}, x={}, y={}, z={}".format(
-            quaternion_opposite[0], quaternion_opposite[1], quaternion_opposite[2], quaternion_opposite[3]))
+        # self.get_logger().warn("朝上边线反方向的四元数表示: w={}, x={}, y={}, z={}".format(
+            # quaternion_opposite[0], quaternion_opposite[1], quaternion_opposite[2], quaternion_opposite[3]))
         
         # 获取圆柱体中心位置
         cylinder_center = np.array([pose.position.x, 
@@ -150,7 +158,7 @@ class PoseSubscriber(Node):
         pre_grasp_point = cylinder_center + offset
 
         # 抓取圆柱体中心
-        offset = result_vector * 0.05 + cylinder_y_axis * 0.03
+        offset = result_vector * 0.02 + cylinder_y_axis * 0.03
         # 计算新的点的坐标
         grasp_point = cylinder_center + offset
 
@@ -174,7 +182,7 @@ class PoseSubscriber(Node):
         goal_msg.pz = position[2]
         
         self._action_client.wait_for_server()
-        rclpy.logging.get_logger('send_action_goal').info('Found action server.')
+        # rclpy.logging.get_logger('send_action_goal').info('Found action server.')
         self._send_goal_future = self._action_client.send_goal_async(goal_msg)
         
         self._send_goal_future.add_done_callback(self.goal_response_callback)
@@ -194,7 +202,10 @@ class PoseSubscriber(Node):
         result = future.result().result
         self.get_logger().info('Result: {0}'.format(result))
         if result.success:
-            self.get_logger().info('Goal succeeded!')
+            self.get_logger().info('Moveing Action Goal succeeded!')
+            # For testing purposes, sleep for 2 seconds
+            rclpy.logging.get_logger('get_result_callback').warn('Sleeping for 2 seconds...')
+            time.sleep(2)
             self.action_done = True
     
     ## 以下是第二个动作的代码
@@ -239,6 +250,9 @@ class PoseSubscriber(Node):
         self.get_logger().info('Result: {0}'.format(result))
         if result.success:
             self.get_logger().info('Goal succeeded!')
+            # For testing purposes, sleep for 2 seconds
+            rclpy.logging.get_logger('get_result_callback').warn('Sleeping for 2 seconds...')
+            time.sleep(2)
             self.pose_action_done = True
  
     def transform_pose(self, pose, source_frame, target_frame):
@@ -249,8 +263,8 @@ class PoseSubscriber(Node):
                     target_frame,
                     source_frame,
                     rclpy.time.Time())
-                self.get_logger().info(
-                    f'Found transform {source_frame} to {target_frame})')
+                # self.get_logger().info(
+                #     f'Found transform {source_frame} to {target_frame})')
                 break
             except TransformException as ex:
                 self.get_logger().debug(
