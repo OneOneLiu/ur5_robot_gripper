@@ -80,26 +80,26 @@ class UR_Tube_Scenario:
         # Open USD assets
         omni.usd.get_context().open_stage("{}/simple_room/simple_room.usd".format(self.assests_root_path))
         self.stage = omni.usd.get_context().get_stage()
-        # load URDF assets
-        results, self.robot_prim_path = self.load_urdf_assets(root_path = "/catkin_ws/src/ur5_robot_gripper/urdf/ur_description", file_name = "ur5.urdf")
-        # Set up the robot joint mimic
-        left_knuckle_joint_path = self.robot_prim_path + "/robotiq_85_base_link/robotiq_85_left_knuckle_joint"
-        left_inner_knuckle_joint_path = self.robot_prim_path + "/robotiq_85_base_link/robotiq_85_left_inner_knuckle_joint"
-        left_finger_tip_joint_path = self.robot_prim_path + "/robotiq_85_left_inner_knuckle_link/robotiq_85_left_finger_tip_joint"
+        # # load URDF assets
+        # results, self.robot_prim_path = self.load_urdf_assets(root_path = "/catkin_ws/src/ur5_robot_gripper/urdf/ur_description", file_name = "ur5.urdf")
+        # # Set up the robot joint mimic
+        # left_knuckle_joint_path = self.robot_prim_path + "/robotiq_85_base_link/robotiq_85_left_knuckle_joint"
+        # left_inner_knuckle_joint_path = self.robot_prim_path + "/robotiq_85_base_link/robotiq_85_left_inner_knuckle_joint"
+        # left_finger_tip_joint_path = self.robot_prim_path + "/robotiq_85_left_inner_knuckle_link/robotiq_85_left_finger_tip_joint"
 
-        self.set_mimic_joints(left_inner_knuckle_joint_path, left_knuckle_joint_path, gearing = -1.0, offset = 0.0)
-        self.set_mimic_joints(left_finger_tip_joint_path, left_knuckle_joint_path, gearing = 1.0, offset = 0.0)
+        # self.set_mimic_joints(left_inner_knuckle_joint_path, left_knuckle_joint_path, gearing = -1.0, offset = 0.0)
+        # self.set_mimic_joints(left_finger_tip_joint_path, left_knuckle_joint_path, gearing = 1.0, offset = 0.0)
         
         # Load Usd assets
         ## Load the tray
         self.load_usd_assets(prim_path="/World/tray", usd_path="{}/tray/tray.usd".format(self.assests_root_path))
-        self.set_object_transforms("/World/tray", (0.54, 0.015, -0.01), (90.0, 0.0, 0.0), (1, 1, 1))
+        self.set_object_transforms("/World/tray", (0.54, 0.015, 0.1), (90.0, 0.0, 0.0), (1, 1, 1))
         
         ## Load the tube racks
-        self.load_usd_assets(prim_path="/World/rack/rack1", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
-        self.set_object_transforms("/World/rack/rack1", (0.6, 0.32, 0.08), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
-        self.load_usd_assets(prim_path="/World/rack/rack2", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
-        self.set_object_transforms("/World/rack/rack2", (0.6, -0.40, 0.08), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
+        # self.load_usd_assets(prim_path="/World/rack/rack1", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
+        # self.set_object_transforms("/World/rack/rack1", (0.6, 0.32, 0.08), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
+        # self.load_usd_assets(prim_path="/World/rack/rack2", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
+        # self.set_object_transforms("/World/rack/rack2", (0.6, -0.40, 0.08), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
         
         ## Load the tubes
         tube75_asset_path = "{}/tube75/tube75.usd".format(self.assests_root_path)
@@ -109,7 +109,7 @@ class UR_Tube_Scenario:
                 rotation = (0.0, 0.0, 0.0)
                 if j:
                     rotation= (0.0, 0.0, 180.0)
-                self.set_object_transforms("/World/tube75/tube75_{}_{}".format(i,j), (0.5 + 0.05*j, 0.05+0.035*j, 0.07+0.045*i), rotation, (0.001, 0.001, 0.001))
+                self.set_object_transforms("/World/tube75/tube75_{}_{}".format(i,j), (0.5 + 0.05*j, 0.05+0.035*j, 0.17+0.045*i), rotation, (0.001, 0.001, 0.001))
         
         tube100_asset_path = "{}/tube100/tube100.usd".format(self.assests_root_path)
         # for i in range (self.horizon):
@@ -121,12 +121,12 @@ class UR_Tube_Scenario:
         #         self.set_object_transforms("/World/tube100/tube100_{}_{}".format(i,j), (0.55 + 0.05*j,  0.05+0.035*j, 0.07+0.045*i), rotation, (0.001, 0.001, 0.001))
         
         # Load demo tubes
-        for i in range (4):
-            self.load_usd_assets(prim_path="/World/tube75/tube75_demo_{}".format(i), usd_path=tube75_asset_path)
-            self.set_object_transforms("/World/tube75/tube75_demo_{}".format(i), (0.6, -0.40+0.016*i, 0.05), (90.0, 0.0, 0.0), (0.001, 0.001, 0.001))
-        for i in range (4):
-            self.load_usd_assets(prim_path="/World/tube100/tube100_demo_{}".format(i), usd_path=tube100_asset_path)
-            self.set_object_transforms("/World/tube100/tube100_demo_{}".format(i), (0.6, 0.32+0.016*i, 0.07), (90.0, 0.0, 0.0), (0.001, 0.001, 0.001))
+        # for i in range (4):
+        #     self.load_usd_assets(prim_path="/World/tube75/tube75_demo_{}".format(i), usd_path=tube75_asset_path)
+        #     self.set_object_transforms("/World/tube75/tube75_demo_{}".format(i), (0.6, -0.40+0.016*i, 0.05), (90.0, 0.0, 0.0), (0.001, 0.001, 0.001))
+        # for i in range (4):
+        #     self.load_usd_assets(prim_path="/World/tube100/tube100_demo_{}".format(i), usd_path=tube100_asset_path)
+        #     self.set_object_transforms("/World/tube100/tube100_demo_{}".format(i), (0.6, 0.32+0.016*i, 0.07), (90.0, 0.0, 0.0), (0.001, 0.001, 0.001))
         
         # Add camera
         self.add_camera("/Camera/Camera1", (1.3, 0.35, 1.3), (30.0, 10.0, 95.0))
