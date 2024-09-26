@@ -28,8 +28,8 @@ def set_object_transforms(object_prim_path, translation, rotation, scale):
 
 
 for i in range(5):
-    add_reference_to_stage("/catkin_ws/src/ur5_robot_gripper/meshes/tube75/tube75.usd", "/World/tube75/tube75_{}_0".format(i))
-    set_object_transforms("/World/tube75/tube75_{}_0".format(i), (0.5, -0.05, 0.3+0.02*i), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
+    add_reference_to_stage("/catkin_ws/src/ur5_robot_gripper/meshes/tube75/tube75.usd", "/World/tube75_test/tube75_{}_0".format(i))
+    set_object_transforms("/World/tube75_test/tube75_{}_0".format(i), (0.5, -0.05, 0.3+0.045*i), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
 
 # for i in range(2):
 #     add_reference_to_stage("/catkin_ws/src/ur5_robot_gripper/meshes/rack/rack.usd", "/World/rack{}".format(i))

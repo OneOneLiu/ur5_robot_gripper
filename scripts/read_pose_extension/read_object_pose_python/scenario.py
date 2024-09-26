@@ -66,7 +66,7 @@ class UR_Tube_Scenario:
         
         # # Set the horizon and vertical for tube numbers
         self.horizon = 5
-        self.vertical = 1
+        self.vertical = 3
 
     def load_example_assets(self):
         """Load assets onto the stage and return them so they can be registered with the
@@ -93,7 +93,7 @@ class UR_Tube_Scenario:
         # Load Usd assets
         ## Load the tray
         self.load_usd_assets(prim_path="/World/tray", usd_path="{}/tray/tray.usd".format(self.assests_root_path))
-        self.set_object_transforms("/World/tray", (0.54, 0.015, 0.1), (90.0, 0.0, 0.0), (1, 1, 1))
+        self.set_object_transforms("/World/tray", (0.54, 0.015, 0.0), (90.0, 0.0, 0.0), (1, 1, 1))
         
         ## Load the tube racks
         # self.load_usd_assets(prim_path="/World/rack/rack1", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
@@ -109,7 +109,7 @@ class UR_Tube_Scenario:
                 rotation = (0.0, 0.0, 0.0)
                 if j:
                     rotation= (0.0, 0.0, 180.0)
-                self.set_object_transforms("/World/tube75/tube75_{}_{}".format(i,j), (0.5 + 0.05*j, 0.05+0.035*j, 0.17+0.045*i), rotation, (0.001, 0.001, 0.001))
+                self.set_object_transforms("/World/tube75/tube75_{}_{}".format(i,j), (0.5 + 0.05*j, 0.05+0.045*j, 0.07+0.02*i), rotation, (0.001, 0.001, 0.001))
         
         tube100_asset_path = "{}/tube100/tube100.usd".format(self.assests_root_path)
         # for i in range (self.horizon):
@@ -118,7 +118,7 @@ class UR_Tube_Scenario:
         #         rotation = (0.0, 0.0, 0.0)
         #         if j:
         #             rotation= (0.0, 0.0, 180.0)
-        #         self.set_object_transforms("/World/tube100/tube100_{}_{}".format(i,j), (0.55 + 0.05*j,  0.05+0.035*j, 0.07+0.045*i), rotation, (0.001, 0.001, 0.001))
+        #         self.set_object_transforms("/World/tube100/tube100_{}_{}".format(i,j), (0.55 + 0.05*j,  0.05+0.035*j, 0.07+0.015*i), rotation, (0.001, 0.001, 0.001))
         
         # Load demo tubes
         # for i in range (4):
