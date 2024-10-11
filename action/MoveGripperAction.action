@@ -1,0 +1,10 @@
+# Goal definition (the position to move the gripper)
+float64 target_position
+
+---
+# Result definition (success or failure)
+bool success
+
+---
+# Feedback definition (percentage completion of the movement)
+float64 percentage_complete

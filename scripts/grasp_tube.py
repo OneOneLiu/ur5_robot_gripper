@@ -9,7 +9,7 @@ import time
 from rclpy.action import ActionClient
 from ur5_robot_gripper.action import MoveToPositionAction
 from ur5_robot_gripper.action import MoveToPoseAction
-
+from ur5_robot_gripper.action import MoveGripperAction
 # tf2
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
@@ -42,6 +42,10 @@ class PoseSubscriber(Node):
         self._pose_client = ActionClient(self, MoveToPoseAction, 'move_to_pose_action')
         self.pose_action_done = True
         
+        # Create a gripper action client  <-- Add Gripper Action Client
+        self._gripper_client = ActionClient(self, MoveGripperAction, 'move_gripper_action')
+        self.gripper_action_done = True
+        
         self.tube_index = 0
 
         # 创建一个tf2 listener
@@ -68,6 +72,7 @@ class PoseSubscriber(Node):
             transformed_pre_grasp_pose = self.transform_pose(pre_grasp_pose, 'isaac_world', 'world')
             transformed_grasp_pose = self.transform_pose(grasping_pose, 'isaac_world', 'world')
             if self.pre_action == "grasp":
+                self.send_gripper_goal(0.5)
                 self.send_pose_goal((transformed_pre_grasp_pose.position.x, transformed_pre_grasp_pose.position.y, transformed_pre_grasp_pose.position.z), (transformed_pre_grasp_pose.orientation.w, transformed_pre_grasp_pose.orientation.x, transformed_pre_grasp_pose.orientation.y, transformed_pre_grasp_pose.orientation.z))
                 rclpy.logging.get_logger('pose_callback').warn('Finished sending pre-grasp goal')
                 self.pose_action_done = False
@@ -89,6 +94,7 @@ class PoseSubscriber(Node):
             # time.sleep(0.5)
             pass
         return 0
+
     def construct_pose(self, position, quaternion):
         pose = Pose()
         pose.position.x = position[0]
@@ -272,7 +278,40 @@ class PoseSubscriber(Node):
         transformed_pose = tf2_geometry_msgs.do_transform_pose(pose, self.t)
         self.get_logger().info('Pose: {0}'.format(pose))
         self.get_logger().info('Transformed pose: {0}'.format(transformed_pose))
-        return transformed_pose      
+        return transformed_pose
+    
+    def send_gripper_goal(self, target_position):
+        '''
+        Send goal to control the gripper
+        args:
+            target_position: Desired gripper position (e.g., 0.8 to close, 0.0 to open)
+        '''
+        goal_msg = MoveGripperAction.Goal()
+        goal_msg.target_position = target_position
+        
+        self._gripper_client.wait_for_server()
+        self.get_logger().info('Sending goal to gripper action server.')
+        self._send_gripper_goal_future = self._gripper_client.send_goal_async(goal_msg)
+        self._send_gripper_goal_future.add_done_callback(self.gripper_goal_response_callback)
+        self.get_logger().info('Gripper goal sent.')
+
+    def gripper_goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('Gripper goal rejected :(')
+            return
+
+        self.get_logger().info('Gripper goal accepted :)')
+        self._get_gripper_result_future = goal_handle.get_result_async()
+        self._get_gripper_result_future.add_done_callback(self.get_gripper_result_callback)
+
+    def get_gripper_result_callback(self, future):
+        result = future.result().result
+        if result.success:
+            self.get_logger().info('Gripper action succeeded!')
+            self.gripper_action_done = True  # Mark the gripper action as done
+        else:
+            self.get_logger().info('Gripper action failed!')
 
 def main(args=None):
     rclpy.init(args=args)

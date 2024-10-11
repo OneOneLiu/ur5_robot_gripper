@@ -65,7 +65,7 @@ class UR_Tube_Scenario:
         self.pub_thread = threading.Thread(target=self.pub_tube_poses)
         
         # # Set the horizon and vertical for tube numbers
-        self.horizon = 5
+        self.horizon = 1
         self.vertical = 3
 
     def load_example_assets(self):

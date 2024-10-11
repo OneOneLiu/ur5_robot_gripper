@@ -25,6 +25,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/PrintPose.srv"
   "action/MoveToPositionAction.action"
   "action/MoveToPoseAction.action"
+  "action/MoveGripperAction.action"
   DEPENDENCIES builtin_interfaces geometry_msgs action_msgs
 )
 
@@ -59,7 +60,7 @@ rosidl_target_interfaces(robot_control_node ${PROJECT_NAME} "rosidl_typesupport_
 install(TARGETS robot_control_node
   DESTINATION lib/${PROJECT_NAME})
 
-# Build a robot_control service c++ executable
+# Build a robot_control test c++ executable
 add_executable(robot_function_test src/robot_function_test.cpp)
 target_include_directories(robot_function_test PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -77,18 +78,53 @@ rosidl_target_interfaces(robot_function_test ${PROJECT_NAME} "rosidl_typesupport
 install(TARGETS robot_function_test
   DESTINATION lib/${PROJECT_NAME})
 
-add_executable(gripper_control src/gripper_control.cpp)
+
+################## Add the gripper_control node ##################
+# Build a gripper_control c++ library
+add_library(gripper_control STATIC src/gripper_control.cpp)
 target_include_directories(gripper_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(gripper_control PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(gripper_control PUBLIC cxx_std_17)  # Require C++17
 ament_target_dependencies(
   gripper_control
-  "moveit_ros_planning_interface"
   "rclcpp"
+  "moveit_ros_planning_interface"
 )
-install(TARGETS gripper_control
+
+# Build a gripper_control service c++ executable
+add_executable(gripper_control_node src/gripper_control_node.cpp)
+target_include_directories(gripper_control_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(gripper_control_node PUBLIC cxx_std_17)  # Require C++17
+ament_target_dependencies(
+  gripper_control_node
+  "rclcpp"
+  "moveit_ros_planning_interface"
+  "geometry_msgs"
+  "rclcpp_action"
+)
+target_link_libraries(gripper_control_node gripper_control)
+rosidl_target_interfaces(gripper_control_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# Install the library and executable
+install(TARGETS gripper_control_node
   DESTINATION lib/${PROJECT_NAME})
+
+################## Add the gripper_control node ##################
+
+# add_executable(gripper_control src/gripper_control.cpp)
+# target_include_directories(gripper_control PUBLIC
+#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+#   $<INSTALL_INTERFACE:include>)
+# target_compile_features(gripper_control PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+# ament_target_dependencies(
+#   gripper_control
+#   "moveit_ros_planning_interface"
+#   "rclcpp"
+# )
+# install(TARGETS gripper_control
+#   DESTINATION lib/${PROJECT_NAME})
 
 # Install folders
 install(PROGRAMS

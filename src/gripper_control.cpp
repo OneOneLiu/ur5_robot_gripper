@@ -1,47 +1,69 @@
-#include <memory>
+#include "ur5_robot_gripper/gripper_control.hpp"
 
-#include <rclcpp/rclcpp.hpp>
-#include <moveit/move_group_interface/move_group_interface.h>
-
-int main(int argc, char * argv[])
+GripperControl::GripperControl(const rclcpp::NodeOptions &options)
+  : Node("gripper_control", options),
+    gripper_move_group_interface_(std::make_shared<rclcpp::Node>("gripper_moveit"), "gripper")
 {
-  // Initialize ROS and create the Node
-  rclcpp::init(argc, argv);
-  auto const node = std::make_shared<rclcpp::Node>(
-    "gripper_moveit",
-    rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true)
-  );
-
-  // Create a ROS logger
-  auto const logger = rclcpp::get_logger("gripper_control");
-
-  using moveit::planning_interface::MoveGroupInterface;
-
-  // 创建控制夹爪的MoveGroup接口
-  auto gripper_move_group_interface = MoveGroupInterface(node, "gripper");
-  
-  // 设置目标关节位置（例如，关闭夹爪的目标位置）
-  std::map<std::string, double> target_joint_values;
-  target_joint_values["robotiq_85_left_knuckle_joint"] = 0.8;  // 根据需要设置目标角度
-  
-  // 将目标关节位置设置为MoveGroup的目标
-  gripper_move_group_interface.setJointValueTarget(target_joint_values);
-  
-  // 规划到目标位置的路径
-  auto const [gripper_success, gripper_plan] = [&gripper_move_group_interface]{
-    moveit::planning_interface::MoveGroupInterface::Plan msg;
-    auto const ok = static_cast<bool>(gripper_move_group_interface.plan(msg));
-    return std::make_pair(ok, msg);
-  }();
-
-  // 执行计划
-  if(gripper_success) {
-    gripper_move_group_interface.execute(gripper_plan);
-  } else {
-    RCLCPP_ERROR(logger, "Gripper planning failed!");
-  }
-  
-  // Shutdown ROS
-  rclcpp::shutdown();
-  return 0;
+    // Create the action server
+    this->action_server_ = rclcpp_action::create_server<MoveGripperAction>(
+      this,
+      "move_gripper_action",
+      std::bind(&GripperControl::handleGoal, this, std::placeholders::_1, std::placeholders::_2),
+      std::bind(&GripperControl::handleCancel, this, std::placeholders::_1),
+      std::bind(&GripperControl::handleAccepted, this, std::placeholders::_1)
+    );
 }
+
+rclcpp_action::GoalResponse GripperControl::handleGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveGripperAction::Goal> goal)
+{
+    RCLCPP_INFO(this->get_logger(), "Received action goal to move gripper to %.2f", goal->target_position);
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
+rclcpp_action::CancelResponse GripperControl::handleCancel(const std::shared_ptr<GoalHandleMoveGripperAction> goal_handle)
+{
+    RCLCPP_INFO(this->get_logger(), "Received cancel request for gripper movement");
+    return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+void GripperControl::handleAccepted(const std::shared_ptr<GoalHandleMoveGripperAction> goal_handle)
+{
+    std::thread([this, goal_handle]() {
+        executeGoal(goal_handle);
+    }).detach();
+}
+
+void GripperControl::executeGoal(const std::shared_ptr<GoalHandleMoveGripperAction> goal_handle)
+{
+    RCLCPP_INFO(this->get_logger(), "Executing gripper action goal...");
+
+    const auto goal = goal_handle->get_goal();
+    auto feedback = std::make_shared<MoveGripperAction::Feedback>();
+    auto result = std::make_shared<MoveGripperAction::Result>();
+
+    // Set the target position for the gripper (e.g., closing the gripper)
+    std::map<std::string, double> target_joint_values;
+    target_joint_values["robotiq_85_left_knuckle_joint"] = goal->target_position;
+
+    gripper_move_group_interface_.setJointValueTarget(target_joint_values);
+
+    // Plan the motion
+    auto const [gripper_success, gripper_plan] = [&]{
+        moveit::planning_interface::MoveGroupInterface::Plan msg;
+        auto const ok = static_cast<bool>(gripper_move_group_interface_.plan(msg));
+        return std::make_pair(ok, msg);
+    }();
+
+    // If the plan is successful, execute it
+    if (gripper_success) {
+        RCLCPP_INFO(this->get_logger(), "Gripper action plan succeeded. Executing...");
+        gripper_move_group_interface_.execute(gripper_plan);
+        result->success = true;
+        goal_handle->succeed(result);
+    } else {
+        RCLCPP_ERROR(this->get_logger(), "Gripper action plan failed!");
+        result->success = false;
+        goal_handle->abort(result);
+    }
+}
+
