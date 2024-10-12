@@ -48,10 +48,13 @@ def generate_launch_description():
     )
     
     # 启动 `ur5_robot_gripper` 包中的 `gripper_control_node` 节点
-    robot_control_node = Node(
+    gripper_control_node = Node(
         package='ur5_robot_gripper',
         executable='gripper_control_node',
         output='screen',
+        parameters=[
+            moveit_config.robot_description_kinematics,  # Load kinematics.yaml
+        ],
     )
 
     # 返回 LaunchDescription，其中包含要启动的两个节点
@@ -59,5 +62,6 @@ def generate_launch_description():
         demo_launch,
         pub_tf_node,
         pose_transform_server_node,
-        robot_control_node
+        robot_control_node,
+        gripper_control_node
     ])
