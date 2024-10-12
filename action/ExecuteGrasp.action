@@ -1,0 +1,10 @@
+# Goal definition
+int32 tube_index  # The index of the tube to be grasped
+
+---
+# Result definition
+bool success  # Indicates if the grasp action was successful
+
+---
+# Feedback definition (optional, can be empty)
+string feedback  # Provides feedback during the action (optional)
