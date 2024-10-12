@@ -111,9 +111,12 @@ class GraspExecutor(Node):
 
         transformed_pre_grasp_pose = self.transform_pose(pre_grasp_pose, 'isaac_world', 'world')
         transformed_grasp_pose = self.transform_pose(grasp_pose, 'isaac_world', 'world')
+        
+        re_oriented_pose = self.calculate_placing_poses(transformed_pre_grasp_pose)
+        transformed_re_oriented_pose = self.transform_pose(re_oriented_pose, 'isaac_world', 'world')
 
         # 执行抓取动作
-        self.execute_action_sequence(transformed_pre_grasp_pose, transformed_grasp_pose)
+        self.execute_action_sequence(transformed_pre_grasp_pose, transformed_grasp_pose, transformed_re_oriented_pose)
 
     def calculate_grasping_poses(self, pose):
         # 实现与原代码相似的逻辑来计算pre-grasp和grasp的位姿
@@ -130,13 +133,37 @@ class GraspExecutor(Node):
         quaternion_opposite = mat2quat(rotation_matrix_opposite)
         
         cylinder_center = np.array([pose.position.x, pose.position.y, pose.position.z])
-        pre_grasp_point = cylinder_center + result_vector * 0.03 + cylinder_y_axis * 0.03
+        pre_grasp_point = cylinder_center + result_vector * 0.1 + cylinder_y_axis * 0.03
         grasp_point = cylinder_center + result_vector * 0.005 + cylinder_y_axis * 0.03
         
         pre_grasp_pose = construct_pose(pre_grasp_point, quaternion_opposite)
         grasp_pose = construct_pose(grasp_point, quaternion_opposite)
-        
+
         return pre_grasp_pose, grasp_pose
+    
+    def calculate_placing_poses(self, pose):
+        # 读取当前在手中的试管姿态，计算y轴与竖直方向的差值，并进行两次逆时针旋转：沿z轴旋转90度，再沿x轴旋转90度
+        q = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
+        rotation_matrix = quat2mat(q)
+
+        # 沿z轴逆时针旋转90度
+        z_rotation = quat2mat([np.cos(np.pi / 4), 0, 0, np.sin(np.pi / 4)])
+        rotation_matrix = np.dot(z_rotation, rotation_matrix)
+
+        # 沿x轴逆时针旋转90度
+        x_rotation = quat2mat([np.cos(np.pi / 4), np.sin(np.pi / 4), 0, 0])
+        rotation_matrix = np.dot(x_rotation, rotation_matrix)
+
+        new_quaternion = mat2quat(rotation_matrix)
+
+        re_oriented_pose = Pose()
+        re_oriented_pose.position = pose.position
+        re_oriented_pose.orientation.w = new_quaternion[0]
+        re_oriented_pose.orientation.x = new_quaternion[1]
+        re_oriented_pose.orientation.y = new_quaternion[2]
+        re_oriented_pose.orientation.z = new_quaternion[3]
+
+        return re_oriented_pose
 
     def transform_pose(self, pose, source_frame, target_frame):
         while True:
@@ -148,7 +175,7 @@ class GraspExecutor(Node):
         transformed_pose = tf2_geometry_msgs.do_transform_pose(pose, t)
         return transformed_pose
 
-    def execute_action_sequence(self, pre_grasp_pose, grasp_pose):
+    def execute_action_sequence(self, pre_grasp_pose, grasp_pose, re_oriented_pose):
         # Consolidate sending goals and handling callbacks into a single function
         self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
         while not self.robot_ready:
@@ -163,6 +190,9 @@ class GraspExecutor(Node):
         while not self.gripper_ready:
             time.sleep(0.1)
         self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
+        while not self.robot_ready:
+            time.sleep(0.1)
+        self.send_pose_goal(re_oriented_pose, velocity_scaling=0.07)
         while not self.robot_ready:
             time.sleep(0.1)
 
