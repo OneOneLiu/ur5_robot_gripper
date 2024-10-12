@@ -130,7 +130,7 @@ class GraspExecutor(Node):
         quaternion_opposite = mat2quat(rotation_matrix_opposite)
         
         cylinder_center = np.array([pose.position.x, pose.position.y, pose.position.z])
-        pre_grasp_point = cylinder_center + result_vector * 0.1 + cylinder_y_axis * 0.03
+        pre_grasp_point = cylinder_center + result_vector * 0.03 + cylinder_y_axis * 0.03
         grasp_point = cylinder_center + result_vector * 0.005 + cylinder_y_axis * 0.03
         
         pre_grasp_pose = construct_pose(pre_grasp_point, quaternion_opposite)
@@ -150,23 +150,23 @@ class GraspExecutor(Node):
 
     def execute_action_sequence(self, pre_grasp_pose, grasp_pose):
         # Consolidate sending goals and handling callbacks into a single function
-        self.send_pose_goal(pre_grasp_pose)
+        self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
         while not self.robot_ready:
             time.sleep(0.1)
         self.send_gripper_goal(0.5)  # 关闭夹爪
         while not self.gripper_ready:
             time.sleep(0.1)
-        self.send_pose_goal(grasp_pose)
+        self.send_pose_goal(grasp_pose, velocity_scaling=0.003)
         while not self.robot_ready:
             time.sleep(0.1)
         self.send_gripper_goal(0.7)  # 关闭夹爪
         while not self.gripper_ready:
             time.sleep(0.1)
-        self.send_pose_goal(pre_grasp_pose)
+        self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
         while not self.robot_ready:
             time.sleep(0.1)
 
-    def send_pose_goal(self, pose):
+    def send_pose_goal(self, pose, velocity_scaling=0.01):
         goal_msg = MoveToPoseAction.Goal()
         goal_msg.px = pose.position.x
         goal_msg.py = pose.position.y
@@ -175,6 +175,7 @@ class GraspExecutor(Node):
         goal_msg.qx = pose.orientation.x
         goal_msg.qy = pose.orientation.y
         goal_msg.qz = pose.orientation.z
+        goal_msg.velocity_scaling = velocity_scaling
         
         self.robot_ready = False  # 设置机器人状态为不准备好
         self._pose_client.wait_for_server()

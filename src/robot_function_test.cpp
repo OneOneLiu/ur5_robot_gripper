@@ -15,7 +15,7 @@ int main(int argc, char** argv)
 
     // 打印菜单
     int option;
-    double px, py, pz, qx, qy, qz, qw;
+    double px, py, pz, qx, qy, qz, qw, velocity_scaling;
 
     do {
         std::cout << "============================\n";
@@ -31,13 +31,13 @@ int main(int argc, char** argv)
             case 1: {
                 std::cout << "Enter target pose (position x y z, orientation qx qy qz qw):\n";
                 std::cin >> px >> py >> pz >> qx >> qy >> qz >> qw;
-                robot_mover->moveToPose(px, py, pz, qx, qy, qz, qw);
+                robot_mover->moveToPose(px, py, pz, qx, qy, qz, qw, velocity_scaling = 0.01);
                 break;
             }
             case 2: {
                 std::cout << "Enter target position (x y z):\n";
                 std::cin >> px >> py >> pz;
-                robot_mover->moveToPosition(px, py, pz);
+                robot_mover->moveToPosition(px, py, pz, velocity_scaling = 0.01);
                 break;
             }
             case 3: {

@@ -54,7 +54,7 @@ void RobotMover::printCurrentPose() {
               << current_pose.orientation.w << ")" << std::endl;
 }
 
-void RobotMover::moveToPose(double px, double py, double pz, double qx, double qy, double qz, double qw)
+void RobotMover::moveToPose(double px, double py, double pz, double qx, double qy, double qz, double qw, double velocity_scaling)
 {
   geometry_msgs::msg::Pose target_pose;
   target_pose.position.x = px;
@@ -68,10 +68,10 @@ void RobotMover::moveToPose(double px, double py, double pz, double qx, double q
   RCLCPP_INFO(this->get_logger(), "Moving to pose (x=%.8f, y=%.8f, z=%.8f, qx=%.8f, qy=%.8f, qz=%.8f, qw=%.8f)", px, py, pz, qx, qy, qz, qw);
 
   move_group_interface_.setPoseTarget(target_pose);
-  executePlan();
+  executePlan(velocity_scaling);
 }
 
-void RobotMover::moveToPosition(double px, double py, double pz)
+void RobotMover::moveToPosition(double px, double py, double pz, double velocity_scaling = 0.01)
 {
   auto current_pose = move_group_interface_.getCurrentPose().pose;
   // 打印当前姿态的位置和方向
@@ -91,17 +91,17 @@ void RobotMover::moveToPosition(double px, double py, double pz)
                 current_pose.orientation.x, current_pose.orientation.y, current_pose.orientation.z, current_pose.orientation.w);
 
   move_group_interface_.setPoseTarget(current_pose);
-  executePlan();
+  executePlan(velocity_scaling);
 }
 
-void RobotMover::executePlan()
+void RobotMover::executePlan(double velocity_scaling)
 {
   move_group_interface_.setGoalOrientationTolerance(0.0001); // Radians, adjust as needed
   move_group_interface_.setGoalPositionTolerance(0.0001); // Meters, adjust as needed
 
   // 设置速度和加速度的缩放因子
-  move_group_interface_.setMaxVelocityScalingFactor(0.05); // 将速度缩放因子设置为30%
-  move_group_interface_.setMaxAccelerationScalingFactor(0.05); // 将加速度缩放因子设置为30%
+  move_group_interface_.setMaxVelocityScalingFactor(velocity_scaling); // 将速度缩放因子设置为30%
+  move_group_interface_.setMaxAccelerationScalingFactor(velocity_scaling); // 将加速度缩放因子设置为30%
   auto const [success, plan] = [&]{
     moveit::planning_interface::MoveGroupInterface::Plan msg;
     auto const ok = static_cast<bool>(move_group_interface_.plan(msg));
@@ -217,13 +217,14 @@ void RobotMover::handlePoseAccepted(const std::shared_ptr<GoalHandleMoveToPoseAc
 void RobotMover::executePoseGoal(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle)
 {
     RCLCPP_INFO(this->get_logger(), "Executing action goal...");
-
     const auto goal = goal_handle->get_goal();
     auto feedback = std::make_shared<MoveToPoseAction::Feedback>();
     auto result = std::make_shared<MoveToPoseAction::Result>();
 
-    // 调用 moveToPose 而不是 moveToPosition
-    moveToPose(goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw);
+    // 调用 moveToPose 并使用 velocity_scaling
+    // move_group_interface_.setMaxVelocityScalingFactor(0.05); // Set velocity scaling factor
+    // move_group_interface_.setMaxAccelerationScalingFactor(0.05); // Set acceleration scaling factor
+    moveToPose(goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw, goal->velocity_scaling);
 
     result->success = true;
     goal_handle->succeed(result);
