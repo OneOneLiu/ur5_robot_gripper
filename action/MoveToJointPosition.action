@@ -1,0 +1,11 @@
+# The goal consists of the target joint angles and velocity scaling
+float64[] joint_positions  # List of joint angles
+float64 velocity_scaling   # Scaling factor for velocity (0.0 to 1.0)
+
+---
+# Result will indicate whether the action succeeded
+bool success
+
+---
+# Feedback consists of the current progress
+float32 percentage_complete

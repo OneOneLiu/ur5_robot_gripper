@@ -10,7 +10,9 @@
 #include "ur5_robot_gripper/srv/move_to_position.hpp"  // Custom service for moving to a position
 #include "ur5_robot_gripper/action/move_to_position_action.hpp"  // MoveToPosition action definition
 #include "ur5_robot_gripper/action/move_to_pose_action.hpp"  // MoveToPose action definition
+#include "ur5_robot_gripper/action/move_to_joint_position.hpp"  // MoveToJointPosition action definition
 #include <iostream>
+#include <vector>
 
 // Type definitions for MoveToPositionAction
 using MoveToPositionAction = ur5_robot_gripper::action::MoveToPositionAction;
@@ -19,6 +21,10 @@ using GoalHandleMoveToPositionAction = rclcpp_action::ServerGoalHandle<MoveToPos
 // Type definitions for MoveToPoseAction
 using MoveToPoseAction = ur5_robot_gripper::action::MoveToPoseAction;
 using GoalHandleMoveToPoseAction = rclcpp_action::ServerGoalHandle<MoveToPoseAction>;
+
+// Type definitions for MoveToJointPosition
+using MoveToJointPosition = ur5_robot_gripper::action::MoveToJointPosition;
+using GoalHandleMoveToJointPosition = rclcpp_action::ServerGoalHandle<MoveToJointPosition>;
 
 class RobotMover : public rclcpp::Node
 {
@@ -32,6 +38,9 @@ public:
     // Method to maintain current orientation and move to a specified position
     void moveToPosition(double px, double py, double pz, double velocity_scaling);
 
+    // Method to move to a specified joint position
+    void moveToJointPosition(const std::vector<double>& joint_angles, double velocity_scaling);
+
     // Method to print the current pose of the robot
     void printCurrentPose();
 
@@ -44,10 +53,10 @@ private:
                           std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Response> response);
     void handleMovePositionRequest(const std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Request> request,
                                 std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Response> response);
-    
+
     // Action for MoveToPosition
     rclcpp_action::Server<MoveToPositionAction>::SharedPtr action_server_;
-    
+
     rclcpp_action::GoalResponse handleGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPositionAction::Goal> goal);
     rclcpp_action::CancelResponse handleCancel(const std::shared_ptr<GoalHandleMoveToPositionAction> goal_handle);
     void handleAccepted(const std::shared_ptr<GoalHandleMoveToPositionAction> goal_handle);
@@ -55,11 +64,19 @@ private:
 
     // Action for MoveToPose
     rclcpp_action::Server<MoveToPoseAction>::SharedPtr move_to_pose_action_server_;
-    
+
     rclcpp_action::GoalResponse handlePoseGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPoseAction::Goal> goal);
     rclcpp_action::CancelResponse handlePoseCancel(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle);
     void handlePoseAccepted(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle);
     void executePoseGoal(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle);
+
+    // Action for MoveToJointPosition
+    rclcpp_action::Server<MoveToJointPosition>::SharedPtr move_to_joint_position_action_server_;
+
+    rclcpp_action::GoalResponse handleJointGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToJointPosition::Goal> goal);
+    rclcpp_action::CancelResponse handleJointCancel(const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle);
+    void handleJointAccepted(const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle);
+    void executeJointGoal(const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle);
 
     // Member variables
     rclcpp::Node::SharedPtr node_; // Additional ROS node pointer

@@ -32,7 +32,14 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
       std::bind(&RobotMover::handlePoseCancel, this, std::placeholders::_1),
       std::bind(&RobotMover::handlePoseAccepted, this, std::placeholders::_1)
     );
-    
+    // Create the action server for MoveToJointPosition
+    this->move_to_joint_position_action_server_ = rclcpp_action::create_server<MoveToJointPosition>(
+      this,
+      "move_to_joint_position_action",
+      std::bind(&RobotMover::handleJointGoal, this, std::placeholders::_1, std::placeholders::_2),
+      std::bind(&RobotMover::handleJointCancel, this, std::placeholders::_1),
+      std::bind(&RobotMover::handleJointAccepted, this, std::placeholders::_1)
+  );
     // Add the node to the executor and start the executor thread
     executor_->add_node(node_);
     executor_thread_ = std::thread([this]() {
@@ -229,4 +236,46 @@ void RobotMover::executePoseGoal(const std::shared_ptr<GoalHandleMoveToPoseActio
     result->success = true;
     goal_handle->succeed(result);
     RCLCPP_INFO(this->get_logger(), "Action goal completed successfully");
+}
+// Add a method for move to joint position
+// Function to move the robot to a specific joint position
+void RobotMover::moveToJointPosition(const std::vector<double>& joint_angles, double velocity_scaling) {
+    move_group_interface_.setJointValueTarget(joint_angles); // Set target joint positions
+    executePlan(velocity_scaling); // Execute the motion plan
+}
+
+// Goal handling function for MoveToJointPosition
+// test: ros2 action send_goal /move_to_joint_position_action ur5_robot_gripper/action/MoveToJointPosition "{joint_positions: [0, -1.57, 1.57, -1.57, -1.57, 0], velocity_scaling: 0.5}"
+
+rclcpp_action::GoalResponse RobotMover::handleJointGoal(const rclcpp_action::GoalUUID& uuid, std::shared_ptr<const MoveToJointPosition::Goal> goal) {
+    RCLCPP_INFO(this->get_logger(), "Received action goal to move to joint positions");
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
+// Cancel handling function for MoveToJointPosition
+rclcpp_action::CancelResponse RobotMover::handleJointCancel(const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle) {
+    RCLCPP_INFO(this->get_logger(), "Received cancel request for move to joint positions");
+    return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+// Accepted goal function for MoveToJointPosition
+void RobotMover::handleJointAccepted(const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle) {
+    std::thread([this, goal_handle]() {
+        executeJointGoal(goal_handle);
+    }).detach();
+}
+
+// Execute the joint position action and publish feedback
+void RobotMover::executeJointGoal(const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle) {
+    RCLCPP_INFO(this->get_logger(), "Executing move to joint positions action goal...");
+    const auto goal = goal_handle->get_goal();
+    auto feedback = std::make_shared<MoveToJointPosition::Feedback>();
+    auto result = std::make_shared<MoveToJointPosition::Result>();
+
+    // Move to the specified joint positions
+    moveToJointPosition(goal->joint_positions, goal->velocity_scaling);
+
+    result->success = true;
+    goal_handle->succeed(result);
+    RCLCPP_INFO(this->get_logger(), "Move to joint positions action goal completed successfully");
 }
