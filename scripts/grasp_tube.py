@@ -3,10 +3,12 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseArray, Pose
 from std_srvs.srv import Trigger
-from ur5_robot_gripper.action import MoveToPositionAction, MoveToPoseAction, MoveGripperAction, ExecuteGrasp
+from ur5_robot_gripper.action import MoveToPositionAction, MoveToPoseAction, MoveGripperAction, ExecuteGrasp, MoveToJointPosition
+from ur5_robot_gripper.srv import PrintPose
 from rclpy.action import ActionClient, ActionServer
 import time
 import numpy as np
+import math
 from transforms3d.quaternions import quat2mat, mat2quat
 from tf2_ros import Buffer, TransformListener
 import tf2_geometry_msgs
@@ -63,6 +65,12 @@ class GraspExecutor(Node):
         # 创建action client
         self._pose_client = ActionClient(self, MoveToPoseAction, 'move_to_pose_action')
         self._gripper_client = ActionClient(self, MoveGripperAction, 'move_gripper_action')
+        self._joint_position_client = ActionClient(self, MoveToJointPosition, 'move_to_joint_position_action')  # Added Action Client for MoveToJointPosition
+        
+        # 创建一个service client，用于获取当前机器人的位姿
+        self._state_client = self.create_client(PrintPose, 'print_current_pose')
+        while not self._state_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for print_current_pose service to become available...')
         
         # 创建一个tf2 listener
         self.tf_buffer = Buffer()
@@ -113,7 +121,8 @@ class GraspExecutor(Node):
         transformed_grasp_pose = self.transform_pose(grasp_pose, 'isaac_world', 'world')
         
         re_oriented_pose = self.calculate_placing_poses(transformed_pre_grasp_pose)
-        transformed_re_oriented_pose = self.transform_pose(re_oriented_pose, 'isaac_world', 'world')
+        # transformed_re_oriented_pose = self.transform_pose(re_oriented_pose, 'isaac_world', 'world')
+        transformed_re_oriented_pose = None
 
         # 执行抓取动作
         self.execute_action_sequence(transformed_pre_grasp_pose, transformed_grasp_pose, transformed_re_oriented_pose)
@@ -134,7 +143,7 @@ class GraspExecutor(Node):
         
         cylinder_center = np.array([pose.position.x, pose.position.y, pose.position.z])
         pre_grasp_point = cylinder_center + result_vector * 0.1 + cylinder_y_axis * 0.03
-        grasp_point = cylinder_center + result_vector * 0.005 + cylinder_y_axis * 0.03
+        grasp_point = cylinder_center + result_vector * 0.0 + cylinder_y_axis * 0.03
         
         pre_grasp_pose = construct_pose(pre_grasp_point, quaternion_opposite)
         grasp_pose = construct_pose(grasp_point, quaternion_opposite)
@@ -142,28 +151,43 @@ class GraspExecutor(Node):
         return pre_grasp_pose, grasp_pose
     
     def calculate_placing_poses(self, pose):
-        # 读取当前在手中的试管姿态，计算y轴与竖直方向的差值，并进行两次逆时针旋转：沿z轴旋转90度，再沿x轴旋转90度
-        q = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
-        rotation_matrix = quat2mat(q)
+        # # 先假设手跟试管没有发生滑动，就是垂直的状态，那么这时候需要构建的机器人pose是y轴向下（与世界的z轴方向相反），z, x轴无所谓，但尽可能朝前，所以可以选择z轴与世界的x轴同向，x轴与世界的y轴相反
+        # world_x_direction = np.array([1, 0, 0])
+        # world_y_direction = np.array([0, 1, 0])
+        # world_z_direction = np.array([0, 0, 1])
+        
+        # # 机器人的姿态方向应当是
+        # robot_x_direction = world_x_direction
+        # robot_y_direction = -world_z_direction
+        # robot_z_direction = world_y_direction
+        
+        # # 据此构建一个旋转矩阵，然后再构建一个四元数
+        # rotation_matrix = np.column_stack((robot_x_direction, robot_y_direction, robot_z_direction))
+        # quaternion = mat2quat(rotation_matrix)
+        
+        # Create a request and send it
+        request = PrintPose.Request()
+        future = self._state_client.call_async(request)
+        self.get_logger().warning('Calling print_current_pose service...')
+        rclpy.spin_until_future_complete(self, future)
+        self.get_logger().warning('Service call completed.')
 
-        # 沿z轴逆时针旋转90度
-        z_rotation = quat2mat([np.cos(np.pi / 4), 0, 0, np.sin(np.pi / 4)])
-        rotation_matrix = np.dot(z_rotation, rotation_matrix)
+        # Check if the service call was successful
+        if future.result() is not None:
+            current_pose = future.result().pose
+            current_joint_angles = future.result().joint_angles
+            self.get_logger().info(f"Current joint angles: {current_joint_angles}")
+        else:
+            self.get_logger().error('Failed to call print_current_pose service')
+            return None
+        
+        # Modify the 6th joint angle to rotate it 90 degrees clockwise (i.e., -π/2 radians)
+        new_joint_angles = current_joint_angles[:]
+        new_joint_angles[5] -= math.pi / 2  # Rotate the 6th joint 90 degrees clockwise
 
-        # 沿x轴逆时针旋转90度
-        x_rotation = quat2mat([np.cos(np.pi / 4), np.sin(np.pi / 4), 0, 0])
-        rotation_matrix = np.dot(x_rotation, rotation_matrix)
+        self.get_logger().info(f"Modified joint angles with 6th joint rotated: {new_joint_angles}")
 
-        new_quaternion = mat2quat(rotation_matrix)
-
-        re_oriented_pose = Pose()
-        re_oriented_pose.position = pose.position
-        re_oriented_pose.orientation.w = new_quaternion[0]
-        re_oriented_pose.orientation.x = new_quaternion[1]
-        re_oriented_pose.orientation.y = new_quaternion[2]
-        re_oriented_pose.orientation.z = new_quaternion[3]
-
-        return re_oriented_pose
+        return new_joint_angles
 
     def transform_pose(self, pose, source_frame, target_frame):
         while True:
@@ -177,24 +201,37 @@ class GraspExecutor(Node):
 
     def execute_action_sequence(self, pre_grasp_pose, grasp_pose, re_oriented_pose):
         # Consolidate sending goals and handling callbacks into a single function
+        self.get_logger().info('Executing action sequence...')
         self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
         while not self.robot_ready:
-            time.sleep(0.1)
+            self.get_logger().info('Waiting for robot to reach pre-grasp pose...')
+            time.sleep(1)
+        self.get_logger().info('Pre-grasp pose reached.')
         self.send_gripper_goal(0.5)  # 关闭夹爪
         while not self.gripper_ready:
-            time.sleep(0.1)
-        self.send_pose_goal(grasp_pose, velocity_scaling=0.003)
+            time.sleep(1)
+        self.get_logger().info('Gripper closed.')
+        self.send_pose_goal(grasp_pose, velocity_scaling=0.01)
         while not self.robot_ready:
-            time.sleep(0.1)
+            time.sleep(1)
+        self.get_logger().info('Grasp pose reached.')
         self.send_gripper_goal(0.7)  # 关闭夹爪
         while not self.gripper_ready:
-            time.sleep(0.1)
-        self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
+            time.sleep(1)
+        self.get_logger().info('Tube grasped.')
+        self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.05)
         while not self.robot_ready:
-            time.sleep(0.1)
-        self.send_pose_goal(re_oriented_pose, velocity_scaling=0.07)
+            time.sleep(1)
+        self.get_logger().info('Pre-grasp pose reached.')
+        # self.send_pose_goal(re_oriented_pose, velocity_scaling=0.05)
+        # while not self.robot_ready:
+        #     time.sleep(1)
+        new_joint_angles = self.calculate_placing_poses()
+        self.get_logger().info(f"Placing joint angles: {new_joint_angles}")
+        self.send_joint_position_goal(new_joint_angles, velocity_scaling=0.05)
+        self.get_logger().info('Action sequence completed.')
         while not self.robot_ready:
-            time.sleep(0.1)
+            time.sleep(1)
 
     def send_pose_goal(self, pose, velocity_scaling=0.01):
         goal_msg = MoveToPoseAction.Goal()
@@ -220,6 +257,17 @@ class GraspExecutor(Node):
         self._send_gripper_goal_future = self._gripper_client.send_goal_async(goal_msg)
         self._send_gripper_goal_future.add_done_callback(lambda future: self.generic_goal_response_callback(future, action_type="gripper"))
 
+    def send_joint_position_goal(self, joint_positions, velocity_scaling=0.01):
+        goal_msg = MoveToJointPosition.Goal()
+        goal_msg.joint_positions = joint_positions  # List of joint positions
+        goal_msg.velocity_scaling = velocity_scaling
+        
+        self.get_logger().info(f'Sending joint position goal: {joint_positions} with velocity scaling: {velocity_scaling}')
+        self.robot_ready = False
+        self._joint_position_client.wait_for_server()
+        self._send_joint_position_goal_future = self._joint_position_client.send_goal_async(goal_msg)
+        self._send_joint_position_goal_future.add_done_callback(lambda future: self.generic_goal_response_callback(future, action_type="robot"))
+
     def generic_goal_response_callback(self, future, action_type="robot"):
         goal_handle = future.result()
         if not goal_handle.accepted:
@@ -236,8 +284,10 @@ class GraspExecutor(Node):
             self.get_logger().info('Action succeeded!')
             if action_type == "gripper":
                 self.gripper_ready = True  # 设置夹爪状态为准备好
+                self.get_logger().info('Gripper ready.')
             elif action_type == "robot":
                 self.robot_ready = True  # 设置机器人状态为准备好
+                self.get_logger().info('Robot ready.')
         else:
             self.get_logger().info('Action failed!')
         time.sleep(2)
@@ -258,3 +308,5 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+# ros2 action send_goal /execute_grasp_action ur5_robot_gripper/action/ExecuteGrasp "{tube_index: 2}"
