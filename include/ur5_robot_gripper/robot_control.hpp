@@ -49,7 +49,7 @@ private:
     void executePlan(double velocity_scaling);
 
     // Service callback functions
-    void handlePrintRequest(const std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Request> /*request*/,
+    void getRobotStateRequest(const std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Request> /*request*/,
                           std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Response> response);
     void handleMovePositionRequest(const std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Request> request,
                                 std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Response> response);

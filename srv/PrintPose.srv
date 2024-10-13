@@ -1,2 +1,7 @@
+# Request (empty)
 ---
+
+# Response
+geometry_msgs/Pose pose
+float64[] joint_angles
 bool success

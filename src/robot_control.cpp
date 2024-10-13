@@ -10,7 +10,7 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
     // Create the service for printing the current pose
     print_current_pose_service_ = this->create_service<ur5_robot_gripper::srv::PrintPose>(
       "print_current_pose", 
-      std::bind(&RobotMover::handlePrintRequest, this, std::placeholders::_1, std::placeholders::_2)
+      std::bind(&RobotMover::getRobotStateRequest, this, std::placeholders::_1, std::placeholders::_2)
     );
     move_to_position_service_ = this->create_service<ur5_robot_gripper::srv::MoveToPosition>(
             "move_to_position", std::bind(&RobotMover::handleMovePositionRequest, this, std::placeholders::_1, std::placeholders::_2));
@@ -48,9 +48,12 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
     });
 }
 
-// Function to print the current end-effector pose
+// Function to print the current end-effector pose and joint angles
 void RobotMover::printCurrentPose() {
     auto current_pose = move_group_interface_.getCurrentPose().pose; // Get the current pose
+    auto current_joint_values = move_group_interface_.getCurrentJointValues(); // Get the current joint angles
+
+    // Print the pose
     std::cout << "Current Pose:" << std::endl;
     std::cout << "Position: (" << current_pose.position.x << ", "
               << current_pose.position.y << ", "
@@ -59,6 +62,12 @@ void RobotMover::printCurrentPose() {
               << current_pose.orientation.y << ", "
               << current_pose.orientation.z << ", "
               << current_pose.orientation.w << ")" << std::endl;
+
+    // Print the joint angles
+    std::cout << "Current Joint Angles:" << std::endl;
+    for (size_t i = 0; i < current_joint_values.size(); ++i) {
+        std::cout << "Joint " << i + 1 << ": " << current_joint_values[i] << std::endl;
+    }
 }
 
 void RobotMover::moveToPose(double px, double py, double pz, double qx, double qy, double qz, double qw, double velocity_scaling)
@@ -122,12 +131,28 @@ void RobotMover::executePlan(double velocity_scaling)
   }
 }
 
-// Service callback function to handle pose printing requests
-void RobotMover::handlePrintRequest(const std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Request> /*request*/,
+// Service callback function to handle pose and joint angle printing requests
+void RobotMover::getRobotStateRequest(const std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Request> /*request*/,
                                     std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Response> response) {
-    // Print the current pose in the service callback
-    RCLCPP_INFO(node_->get_logger(), "Service Callback: About to call printCurrentPose in Private");
-    printCurrentPose(); // Print the robot's current pose
+    // Get the current pose and joint angles
+    auto current_pose = move_group_interface_.getCurrentPose().pose; 
+    auto current_joint_values = move_group_interface_.getCurrentJointValues(); 
+
+    // Print both pose and joint angles
+    RCLCPP_INFO(node_->get_logger(), "Service Callback: Current Pose and Joint Angles:");
+    printCurrentPose(); // Print pose and joint angles
+
+    // Set the pose in the response
+    response->pose.position.x = current_pose.position.x;
+    response->pose.position.y = current_pose.position.y;
+    response->pose.position.z = current_pose.position.z;
+    response->pose.orientation.x = current_pose.orientation.x;
+    response->pose.orientation.y = current_pose.orientation.y;
+    response->pose.orientation.z = current_pose.orientation.z;
+    response->pose.orientation.w = current_pose.orientation.w;
+
+    // Set the joint angles in the response
+    response->joint_angles = current_joint_values;
 
     // Set the response to indicate success
     response->success = true;
