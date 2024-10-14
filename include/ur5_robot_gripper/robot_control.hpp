@@ -33,7 +33,7 @@ public:
     explicit RobotMover(const rclcpp::NodeOptions &options);
 
     // Method to move to a specified pose
-    void moveToPose(double px, double py, double pz, double qx, double qy, double qz, double qw, double velocity_scaling);
+    bool moveToPose(double px, double py, double pz, double qx, double qy, double qz, double qw, double velocity_scaling);
 
     // Method to maintain current orientation and move to a specified position
     void moveToPosition(double px, double py, double pz, double velocity_scaling);
@@ -46,7 +46,7 @@ public:
 
 private:
     // Helper method to execute a motion plan
-    void executePlan(double velocity_scaling);
+    bool executePlan(double velocity_scaling);
 
     // Service callback functions
     void getRobotStateRequest(const std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Request> /*request*/,

@@ -70,7 +70,7 @@ void RobotMover::printCurrentPose() {
     }
 }
 
-void RobotMover::moveToPose(double px, double py, double pz, double qx, double qy, double qz, double qw, double velocity_scaling)
+bool RobotMover::moveToPose(double px, double py, double pz, double qx, double qy, double qz, double qw, double velocity_scaling)
 {
   geometry_msgs::msg::Pose target_pose;
   target_pose.position.x = px;
@@ -84,7 +84,13 @@ void RobotMover::moveToPose(double px, double py, double pz, double qx, double q
   RCLCPP_INFO(this->get_logger(), "Moving to pose (x=%.8f, y=%.8f, z=%.8f, qx=%.8f, qy=%.8f, qz=%.8f, qw=%.8f)", px, py, pz, qx, qy, qz, qw);
 
   move_group_interface_.setPoseTarget(target_pose);
-  executePlan(velocity_scaling);
+  if (executePlan(velocity_scaling)) {
+    RCLCPP_INFO(this->get_logger(), "Motion executed successfully.");
+    return true;
+  } else {
+      RCLCPP_ERROR(this->get_logger(), "Motion execution failed.");
+      return false;
+}
 }
 
 void RobotMover::moveToPosition(double px, double py, double pz, double velocity_scaling = 0.01)
@@ -110,25 +116,39 @@ void RobotMover::moveToPosition(double px, double py, double pz, double velocity
   executePlan(velocity_scaling);
 }
 
-void RobotMover::executePlan(double velocity_scaling)
+bool RobotMover::executePlan(double velocity_scaling)
 {
   move_group_interface_.setGoalOrientationTolerance(0.0001); // Radians, adjust as needed
   move_group_interface_.setGoalPositionTolerance(0.0001); // Meters, adjust as needed
 
   // 设置速度和加速度的缩放因子
-  move_group_interface_.setMaxVelocityScalingFactor(velocity_scaling); // 将速度缩放因子设置为30%
-  move_group_interface_.setMaxAccelerationScalingFactor(velocity_scaling); // 将加速度缩放因子设置为30%
+  move_group_interface_.setMaxVelocityScalingFactor(velocity_scaling); 
+  move_group_interface_.setMaxAccelerationScalingFactor(velocity_scaling); 
+
+  // 规划运动
   auto const [success, plan] = [&]{
     moveit::planning_interface::MoveGroupInterface::Plan msg;
     auto const ok = static_cast<bool>(move_group_interface_.plan(msg));
     return std::make_pair(ok, msg);
   }();
 
-  if (success) {
-    move_group_interface_.execute(plan);
-  } else {
+  // 检查规划是否成功
+  if (!success) {
     RCLCPP_ERROR(rclcpp::get_logger("robot_control"), "Planning failed!");
+    return false;  // 规划失败，返回 false
   }
+
+  // 执行运动
+  auto execute_status = move_group_interface_.execute(plan);
+
+  // 检查执行状态
+  if (execute_status != moveit::planning_interface::MoveItErrorCode::SUCCESS) {
+    RCLCPP_ERROR(rclcpp::get_logger("robot_control"), "Execution failed!");
+    return false;  // 执行失败，返回 false
+  }
+
+  RCLCPP_INFO(rclcpp::get_logger("robot_control"), "Execution succeeded!");
+  return true;  // 成功执行，返回 true
 }
 
 // Service callback function to handle pose and joint angle printing requests
@@ -253,20 +273,28 @@ void RobotMover::executePoseGoal(const std::shared_ptr<GoalHandleMoveToPoseActio
     auto feedback = std::make_shared<MoveToPoseAction::Feedback>();
     auto result = std::make_shared<MoveToPoseAction::Result>();
 
-    // 调用 moveToPose 并使用 velocity_scaling
-    // move_group_interface_.setMaxVelocityScalingFactor(0.05); // Set velocity scaling factor
-    // move_group_interface_.setMaxAccelerationScalingFactor(0.05); // Set acceleration scaling factor
-    moveToPose(goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw, goal->velocity_scaling);
-
-    result->success = true;
-    goal_handle->succeed(result);
-    RCLCPP_INFO(this->get_logger(), "Action goal completed successfully");
+    // 调用 moveToPose
+    // moveToPose 执行完毕后，检查规划和执行结果
+    if (moveToPose(goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw, goal->velocity_scaling)) {
+        result->success = true;
+        goal_handle->succeed(result);
+        RCLCPP_INFO(this->get_logger(), "Action goal completed successfully");
+    } else {
+        result->success = false;
+        goal_handle->abort(result);
+        RCLCPP_ERROR(this->get_logger(), "Failed to execute motion plan");
+    }
 }
+
 // Add a method for move to joint position
 // Function to move the robot to a specific joint position
 void RobotMover::moveToJointPosition(const std::vector<double>& joint_angles, double velocity_scaling) {
     move_group_interface_.setJointValueTarget(joint_angles); // Set target joint positions
-    executePlan(velocity_scaling); // Execute the motion plan
+    if (executePlan(velocity_scaling)) {
+    RCLCPP_INFO(this->get_logger(), "Motion executed successfully.");
+  } else {
+      RCLCPP_ERROR(this->get_logger(), "Motion execution failed.");
+}
 }
 
 // Goal handling function for MoveToJointPosition
