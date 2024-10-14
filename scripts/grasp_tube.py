@@ -10,6 +10,7 @@ import time
 import numpy as np
 import math
 from transforms3d.quaternions import quat2mat, mat2quat
+from transforms3d.axangles import axangle2mat
 from tf2_ros import Buffer, TransformListener
 import tf2_geometry_msgs
 from tf2_ros import TransformException
@@ -131,6 +132,8 @@ class GraspExecutor(Node):
         self.pose_array = None
         # 存储当前机器人的位姿和关节角度
         self.current_joint_angles = None
+        
+        self.action_succeeded = True
 
     def set_pose_array(self, pose_array):
         self.pose_array = pose_array
@@ -245,42 +248,113 @@ class GraspExecutor(Node):
         self.placing_tube(tube_index)
 
     def placing_tube(self, tube_index):
-        # 设定放置管子的位姿
+        # 设定放置管子的位置，姿态在后面生成
         placing_pose = Pose()
         placing_pose.position.x = 0.6
         placing_pose.position.y = 0.32
-        placing_pose.position.z = 0.18
-        placing_pose.orientation.x = 0.0
-        placing_pose.orientation.y = 0.0
-        placing_pose.orientation.z = 0.0
-        placing_pose.orientation.w = 1.0
-        # 获取当前机器人的状态
+        placing_pose.position.z = 0.08 + 0.05 # 设定位置为孔的第一个位置上方5cm
+        
+        # 获取当前管子的姿态
+        current_tube_pose = self.pose_array.poses[tube_index]
+        current_tube_rotation_matrix = quat2mat([current_tube_pose.orientation.w,
+                                            current_tube_pose.orientation.x,
+                                            current_tube_pose.orientation.y,
+                                            current_tube_pose.orientation.z])
+        current_y_axis = current_tube_rotation_matrix[:, 1]  # 当前的 y 轴方向
+        target_y_axis = np.array([0, 0, 1])  # 目标 y 轴是世界坐标系中的 z 轴
+        
+        # 通过轴角方式计算将当前 y 轴旋转到目标 y 轴 (世界坐标系z轴) 的旋转矩阵
+        # 先计算旋转轴
+        rotation_axis = np.cross(current_y_axis, target_y_axis)
+        if np.linalg.norm(rotation_axis) > 1e-6:  # 避免零向量的情况
+            rotation_axis = rotation_axis / np.linalg.norm(rotation_axis)
+            # 再计算旋转角度
+            rotation_angle = np.arccos(np.dot(current_y_axis, target_y_axis))
+            rotation_matrix_to_target_y = axangle2mat(rotation_axis, rotation_angle)
+        else:
+            # 如果 y 轴已经对齐，不需要旋转
+            rotation_matrix_to_target_y = np.eye(3)
+        
+        # 将当前表示姿态的旋转矩阵与上面求到的旋转矩阵相乘 -> 得到的就是立着的管子的旋转矩阵（姿态）
+        tube_y_2_world_z_rotation_matrix = np.dot(rotation_matrix_to_target_y, current_tube_rotation_matrix) # np.dot(R1, R2)：这表示先执行 R2 的旋转，然后执行 R1 的旋转。
+        
+        ## tube y轴与世界z轴对齐，tube的 x, z轴可以绕世界z轴旋转，下面生成一组候选的旋转，机器人执行时挨个去试
+        # 创建一个数组存储所有候选的旋转四元数
+        candidate_quaternions = []
+        ## 下面需要生成一组候选的，具有不同的x,z轴旋转的旋转矩阵
+        for angle_deg in range(0, 360, 10):
+            angle_rad = np.radians(angle_deg)
+            rotation_matrix = axangle2mat([0, 0, 1], angle_rad)
+            
+            # 最终的试管目标姿态矩阵即为：上面求到的保证tube y轴与世界z轴对齐，同时乘上不同的绕世界z的旋转矩阵
+            final_rotation_matrix = np.dot(rotation_matrix, tube_y_2_world_z_rotation_matrix) 
+            final_quaternion = mat2quat(final_rotation_matrix)
+            candidate_quaternions.append(final_quaternion)
+
+        # 上面求得的旋转矩阵表示试管应当如何进行旋转，才能使得它立着，后面把它变换成机器人的旋转矩阵
+        # 获取当前机器人的位姿
         self.get_current_robot_state()
         robot_pose = self.current_robot_pose
         robot_pose_in_isaac_world = self.transform_pose(robot_pose, 'world', 'isaac_world')
-        # 获取当前管子的位姿
-        tube_pose = self.pose_array.poses[tube_index]
-        
-        # 计算管子与机器人之间的变换矩阵
+
+        # 计算tube与机器人之间的变换矩阵 （假设它在后续过程中都保持不变）
         robot_matrix = pose_to_matrix(robot_pose_in_isaac_world)
-        tube_matrix = pose_to_matrix(tube_pose)
+        tube_matrix = pose_to_matrix(current_tube_pose)
         
+        # 计算相对变换矩阵
         relative_transform = np.linalg.inv(robot_matrix).dot(tube_matrix)
-        relative_transform1 = np.linalg.inv(tube_matrix).dot(robot_matrix)
         
-        new_robot_pose = apply_transform(placing_pose, relative_transform1)
-        transformed_placing_pose = self.transform_pose(new_robot_pose, 'isaac_world', 'world')
+        # 依次尝试每个候选的旋转四元数
+        for i, candidate_quaternion in enumerate(candidate_quaternions):
+            self.get_logger().info(f'Trying pose {i}, the quaternion is {candidate_quaternion}.')
+            placing_pose.orientation.w = candidate_quaternion[0]
+            placing_pose.orientation.x = candidate_quaternion[1]
+            placing_pose.orientation.y = candidate_quaternion[2]
+            placing_pose.orientation.z = candidate_quaternion[3]
+            new_robot_pose = apply_transform(placing_pose, relative_transform) # 这个的平移是对的
+            
+            transformed_placing_pose = self.transform_pose(new_robot_pose, 'isaac_world', 'world')
+            
+            # 发送放置动作
+            self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.05)
+            self.get_logger().info(f'Trying pose {i}.')
+            if self.action_succeeded:
+                break
         
-        x=0.5178879634425592
-        y=-0.4814145813368711
-        z=0.5179544730306757
-        w=-0.48140961983022185
-        transformed_placing_pose.orientation.x = x
-        transformed_placing_pose.orientation.y = y
-        transformed_placing_pose.orientation.z = z
-        transformed_placing_pose.orientation.w = w
+        # 微调试管的放置位置
+        # 确认试管当前的姿态是y轴朝上的
+        ## TODO
+        # 读取当前试管的位置
+        while True:
+            current_tube_pose = self.pose_array.poses[tube_index]
+            offset_x = placing_pose.position.x - current_tube_pose.position.x
+            offset_y = placing_pose.position.y - current_tube_pose.position.y
+            offset_z = placing_pose.position.z - current_tube_pose.position.z
+            # TODO：除了检查位置，还需要检查姿态是否正确，有时会不
+            
+            if (math.sqrt(offset_x**2 + offset_y**2 + offset_z**2)) > 0.001:
+                self.get_logger().info('Tube is not placed correctly. Adjusting...')
+                print(self.current_robot_pose)
+                # :BUG: 这里的机器人位姿似乎没有正常更新，还是用的旧的位姿，sleep 1s 试之后正常了
+                self.get_current_robot_state()
+                time.sleep(1)
+                robot_pose = self.current_robot_pose
+                print(self.current_robot_pose)
+                robot_pose_in_isaac_world = self.transform_pose(robot_pose, 'world', 'isaac_world')
+                robot_pose_in_isaac_world.position.x += offset_x
+                robot_pose_in_isaac_world.position.y += offset_y
+                robot_pose_in_isaac_world.position.z += offset_z
+                
+                transformed_placing_pose = self.transform_pose(robot_pose_in_isaac_world, 'isaac_world', 'world')
+                self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.05)
+            else:
+                self.get_logger().info('Tube placed correctly.')
+                break
         
-        self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.05)
+        transformed_placing_pose.position.z -= 0.08  # 将放置位置下移5cm
+        self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.01)
+        self.send_gripper_goal(0.5)  # 打开夹爪
+        self.get_logger().info('Tube placed.')
         
         return transformed_placing_pose
 
@@ -296,24 +370,27 @@ class GraspExecutor(Node):
         goal_msg.velocity_scaling = velocity_scaling
         
         self.robot_ready = False  # 设置机器人状态为不准备好
+        self.action_succeeded = False  # 设置动作执行状态为失败
         self._pose_client.wait_for_server()
         self._send_goal_future = self._pose_client.send_goal_async(goal_msg)
         self._send_goal_future.add_done_callback(lambda future: self.generic_goal_response_callback(future, action_type="robot"))
         
         while not self.robot_ready:
             self.get_logger().debug('Waiting for robot to reach the given pose...')
-            time.sleep(0.5)
+            time.sleep(0.1)
 
     def send_gripper_goal(self, target_position):
         goal_msg = MoveGripperAction.Goal()
         goal_msg.target_position = target_position
+
         self.gripper_ready = False  # 设置夹爪状态为不准备好
+        self.action_succeeded = False  # 设置动作执行状态为失败
         self._gripper_client.wait_for_server()
         self._send_gripper_goal_future = self._gripper_client.send_goal_async(goal_msg)
         self._send_gripper_goal_future.add_done_callback(lambda future: self.generic_goal_response_callback(future, action_type="gripper"))
         while not self.gripper_ready:
             self.get_logger().debug('Waiting for gripper to reach the target position...')
-            time.sleep(0.5)
+            time.sleep(0.1)
 
     def send_joint_position_goal(self, joint_positions, velocity_scaling=0.01):
         goal_msg = MoveToJointPosition.Goal()
@@ -340,15 +417,23 @@ class GraspExecutor(Node):
         result = future.result().result
         if result.success:
             self.get_logger().info('Action succeeded!')
+            self.action_succeeded = True
             if action_type == "gripper":
                 self.gripper_ready = True  # 设置夹爪状态为准备好
                 self.get_logger().info('Gripper ready.')
             elif action_type == "robot":
                 self.robot_ready = True  # 设置机器人状态为准备好
                 self.get_logger().info('Robot ready.')
+            time.sleep(2)
         else:
             self.get_logger().info('Action failed!')
-        time.sleep(2)
+            self.action_succeeded = False
+            if action_type == "gripper":
+                self.gripper_ready = True  # 设置夹爪状态为准备好
+                self.get_logger().info('Gripper ready.')
+            elif action_type == "robot":
+                self.robot_ready = True  # 设置机器人状态为准备好
+                self.get_logger().info('Robot ready.')
 
     def get_current_robot_state(self):
         # 通过异步方式调用 service 获取当前的机器人状态
@@ -398,4 +483,4 @@ def main(args=None):
 if __name__ == '__main__':
     main()
 
-# ros2 action send_goal /execute_grasp_action ur5_robot_gripper/action/ExecuteGrasp "{tube_index: 2}"
+# ros2 action send_goal /execute_grasp_action ur5_robot_gripper/action/ExecuteGrasp "{tube_index: 0}"
