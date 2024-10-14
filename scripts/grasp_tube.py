@@ -32,6 +32,48 @@ def construct_pose(position, quaternion):
     pose.orientation.z = quaternion[3]
     return pose
 
+def pose_to_matrix(pose):
+    # 提取平移
+    translation = np.array([pose.position.x, pose.position.y, pose.position.z])
+
+    # 提取四元数并转换为旋转矩阵
+    quaternion = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
+    rotation_matrix = quat2mat(quaternion)
+
+    # 构建4x4的变换矩阵
+    transform_matrix = np.eye(4)
+    transform_matrix[:3, :3] = rotation_matrix
+    transform_matrix[:3, 3] = translation
+
+    return transform_matrix
+
+def apply_transform(robot_pose, relative_transform):
+    # 将机器人的姿态转换为矩阵
+    robot_matrix = pose_to_matrix(robot_pose)
+
+    # 计算新的机器人姿态矩阵
+    new_robot_matrix = robot_matrix.dot(relative_transform)
+
+    # 提取新的平移和旋转
+    new_translation = new_robot_matrix[:3, 3]
+    new_rotation_matrix = new_robot_matrix[:3, :3]
+    
+    # 转换为四元数
+    from transforms3d.quaternions import mat2quat
+    new_quaternion = mat2quat(new_rotation_matrix)
+
+    # 构建新的 Pose
+    new_pose = Pose()
+    new_pose.position.x = new_translation[0]
+    new_pose.position.y = new_translation[1]
+    new_pose.position.z = new_translation[2]
+    new_pose.orientation.w = new_quaternion[0]
+    new_pose.orientation.x = new_quaternion[1]
+    new_pose.orientation.y = new_quaternion[2]
+    new_pose.orientation.z = new_quaternion[3]
+
+    return new_pose
+
 class PoseSubscriber(Node):
     def __init__(self, grasp_executor):
         super().__init__('pose_subscriber')
@@ -87,6 +129,8 @@ class GraspExecutor(Node):
         
         # 存储姿态数组
         self.pose_array = None
+        # 存储当前机器人的位姿和关节角度
+        self.current_joint_angles = None
 
     def set_pose_array(self, pose_array):
         self.pose_array = pose_array
@@ -120,12 +164,12 @@ class GraspExecutor(Node):
         transformed_pre_grasp_pose = self.transform_pose(pre_grasp_pose, 'isaac_world', 'world')
         transformed_grasp_pose = self.transform_pose(grasp_pose, 'isaac_world', 'world')
         
-        re_oriented_pose = self.calculate_placing_poses(transformed_pre_grasp_pose)
+        # re_oriented_pose = self.calculate_placing_poses(transformed_pre_grasp_pose)
         # transformed_re_oriented_pose = self.transform_pose(re_oriented_pose, 'isaac_world', 'world')
         transformed_re_oriented_pose = None
 
         # 执行抓取动作
-        self.execute_action_sequence(transformed_pre_grasp_pose, transformed_grasp_pose, transformed_re_oriented_pose)
+        self.execute_action_sequence(transformed_pre_grasp_pose, transformed_grasp_pose, transformed_re_oriented_pose, tube_index)
 
     def calculate_grasping_poses(self, pose):
         # 实现与原代码相似的逻辑来计算pre-grasp和grasp的位姿
@@ -142,52 +186,31 @@ class GraspExecutor(Node):
         quaternion_opposite = mat2quat(rotation_matrix_opposite)
         
         cylinder_center = np.array([pose.position.x, pose.position.y, pose.position.z])
-        pre_grasp_point = cylinder_center + result_vector * 0.1 + cylinder_y_axis * 0.03
-        grasp_point = cylinder_center + result_vector * 0.0 + cylinder_y_axis * 0.03
+        pre_grasp_point = cylinder_center + result_vector * 0.1 + cylinder_y_axis * 0.05
+        grasp_point = cylinder_center + result_vector * 0.0 + cylinder_y_axis * 0.05
         
         pre_grasp_pose = construct_pose(pre_grasp_point, quaternion_opposite)
         grasp_pose = construct_pose(grasp_point, quaternion_opposite)
 
         return pre_grasp_pose, grasp_pose
     
-    def calculate_placing_poses(self, pose):
-        # # 先假设手跟试管没有发生滑动，就是垂直的状态，那么这时候需要构建的机器人pose是y轴向下（与世界的z轴方向相反），z, x轴无所谓，但尽可能朝前，所以可以选择z轴与世界的x轴同向，x轴与世界的y轴相反
-        # world_x_direction = np.array([1, 0, 0])
-        # world_y_direction = np.array([0, 1, 0])
-        # world_z_direction = np.array([0, 0, 1])
-        
-        # # 机器人的姿态方向应当是
-        # robot_x_direction = world_x_direction
-        # robot_y_direction = -world_z_direction
-        # robot_z_direction = world_y_direction
-        
-        # # 据此构建一个旋转矩阵，然后再构建一个四元数
-        # rotation_matrix = np.column_stack((robot_x_direction, robot_y_direction, robot_z_direction))
-        # quaternion = mat2quat(rotation_matrix)
-        
-        # Create a request and send it
-        request = PrintPose.Request()
-        future = self._state_client.call_async(request)
-        self.get_logger().warning('Calling print_current_pose service...')
-        rclpy.spin_until_future_complete(self, future)
-        self.get_logger().warning('Service call completed.')
+    def calculate_placing_poses(self, pose = None):
+        # 先获取当前机器人的状态
+        self.get_current_robot_state()
 
-        # Check if the service call was successful
-        if future.result() is not None:
-            current_pose = future.result().pose
-            current_joint_angles = future.result().joint_angles
-            self.get_logger().info(f"Current joint angles: {current_joint_angles}")
+        # 假设已经获取到了self.current_joint_angles，并使用它来进行计算
+        if self.current_joint_angles is not None:
+            # Modify the 6th joint angle to rotate it 90 degrees clockwise (i.e., -π/2 radians)
+            new_joint_angles = self.current_joint_angles[:]
+            new_joint_angles[5] -= math.pi / 4  # Rotate the 6th joint 90 degrees clockwise
+
+            self.get_logger().info(f"Modified joint angles with 6th joint rotated: {new_joint_angles}")
+
+            return new_joint_angles
         else:
-            self.get_logger().error('Failed to call print_current_pose service')
+            self.get_logger().warning('Current joint angles not available yet!')
             return None
-        
-        # Modify the 6th joint angle to rotate it 90 degrees clockwise (i.e., -π/2 radians)
-        new_joint_angles = current_joint_angles[:]
-        new_joint_angles[5] -= math.pi / 2  # Rotate the 6th joint 90 degrees clockwise
 
-        self.get_logger().info(f"Modified joint angles with 6th joint rotated: {new_joint_angles}")
-
-        return new_joint_angles
 
     def transform_pose(self, pose, source_frame, target_frame):
         while True:
@@ -199,39 +222,67 @@ class GraspExecutor(Node):
         transformed_pose = tf2_geometry_msgs.do_transform_pose(pose, t)
         return transformed_pose
 
-    def execute_action_sequence(self, pre_grasp_pose, grasp_pose, re_oriented_pose):
+    def execute_action_sequence(self, pre_grasp_pose, grasp_pose, re_oriented_pose, tube_index):
         # Consolidate sending goals and handling callbacks into a single function
         self.get_logger().info('Executing action sequence...')
         self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
-        while not self.robot_ready:
-            self.get_logger().info('Waiting for robot to reach pre-grasp pose...')
-            time.sleep(1)
         self.get_logger().info('Pre-grasp pose reached.')
         self.send_gripper_goal(0.5)  # 关闭夹爪
-        while not self.gripper_ready:
-            time.sleep(1)
         self.get_logger().info('Gripper closed.')
         self.send_pose_goal(grasp_pose, velocity_scaling=0.01)
-        while not self.robot_ready:
-            time.sleep(1)
         self.get_logger().info('Grasp pose reached.')
         self.send_gripper_goal(0.7)  # 关闭夹爪
-        while not self.gripper_ready:
-            time.sleep(1)
         self.get_logger().info('Tube grasped.')
         self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.05)
-        while not self.robot_ready:
-            time.sleep(1)
         self.get_logger().info('Pre-grasp pose reached.')
-        # self.send_pose_goal(re_oriented_pose, velocity_scaling=0.05)
-        # while not self.robot_ready:
-        #     time.sleep(1)
-        new_joint_angles = self.calculate_placing_poses()
-        self.get_logger().info(f"Placing joint angles: {new_joint_angles}")
-        self.send_joint_position_goal(new_joint_angles, velocity_scaling=0.05)
-        self.get_logger().info('Action sequence completed.')
-        while not self.robot_ready:
-            time.sleep(1)
+        # array('d', [-1.536058644578639, -1.2418357984149566, 1.622218157889908, -1.972800967355929, -1.5932304181778447, 0.019746842630313566])
+        # geometry_msgs.msg.Pose(position=geometry_msgs.msg.Point(x=0.35140546093353975, y=-0.6029201291432347, z=0.3716432330812862), orientation=geometry_msgs.msg.Quaternion(x=0.5178879634425592, y=-0.4814145813368711, z=0.5179544730306757, w=-0.48140961983022185))
+        # pre_placing_joint_angles = [-math.pi/2, -1.2418357984149566, math.pi/2, -1.972800967355929, 0.0000, -math.pi/2]
+        # self.send_joint_position_goal(pre_placing_joint_angles, velocity_scaling=0.05)
+        # self.get_logger().info('Action sequence completed.')
+        
+        # Add placing action here
+        self.placing_tube(tube_index)
+
+    def placing_tube(self, tube_index):
+        # 设定放置管子的位姿
+        placing_pose = Pose()
+        placing_pose.position.x = 0.6
+        placing_pose.position.y = 0.32
+        placing_pose.position.z = 0.18
+        placing_pose.orientation.x = 0.0
+        placing_pose.orientation.y = 0.0
+        placing_pose.orientation.z = 0.0
+        placing_pose.orientation.w = 1.0
+        # 获取当前机器人的状态
+        self.get_current_robot_state()
+        robot_pose = self.current_robot_pose
+        robot_pose_in_isaac_world = self.transform_pose(robot_pose, 'world', 'isaac_world')
+        # 获取当前管子的位姿
+        tube_pose = self.pose_array.poses[tube_index]
+        
+        # 计算管子与机器人之间的变换矩阵
+        robot_matrix = pose_to_matrix(robot_pose_in_isaac_world)
+        tube_matrix = pose_to_matrix(tube_pose)
+        
+        relative_transform = np.linalg.inv(robot_matrix).dot(tube_matrix)
+        relative_transform1 = np.linalg.inv(tube_matrix).dot(robot_matrix)
+        
+        new_robot_pose = apply_transform(placing_pose, relative_transform1)
+        transformed_placing_pose = self.transform_pose(new_robot_pose, 'isaac_world', 'world')
+        
+        x=0.5178879634425592
+        y=-0.4814145813368711
+        z=0.5179544730306757
+        w=-0.48140961983022185
+        transformed_placing_pose.orientation.x = x
+        transformed_placing_pose.orientation.y = y
+        transformed_placing_pose.orientation.z = z
+        transformed_placing_pose.orientation.w = w
+        
+        self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.05)
+        
+        return transformed_placing_pose
 
     def send_pose_goal(self, pose, velocity_scaling=0.01):
         goal_msg = MoveToPoseAction.Goal()
@@ -248,6 +299,10 @@ class GraspExecutor(Node):
         self._pose_client.wait_for_server()
         self._send_goal_future = self._pose_client.send_goal_async(goal_msg)
         self._send_goal_future.add_done_callback(lambda future: self.generic_goal_response_callback(future, action_type="robot"))
+        
+        while not self.robot_ready:
+            self.get_logger().debug('Waiting for robot to reach the given pose...')
+            time.sleep(0.5)
 
     def send_gripper_goal(self, target_position):
         goal_msg = MoveGripperAction.Goal()
@@ -256,6 +311,9 @@ class GraspExecutor(Node):
         self._gripper_client.wait_for_server()
         self._send_gripper_goal_future = self._gripper_client.send_goal_async(goal_msg)
         self._send_gripper_goal_future.add_done_callback(lambda future: self.generic_goal_response_callback(future, action_type="gripper"))
+        while not self.gripper_ready:
+            self.get_logger().debug('Waiting for gripper to reach the target position...')
+            time.sleep(0.5)
 
     def send_joint_position_goal(self, joint_positions, velocity_scaling=0.01):
         goal_msg = MoveToJointPosition.Goal()
@@ -291,6 +349,37 @@ class GraspExecutor(Node):
         else:
             self.get_logger().info('Action failed!')
         time.sleep(2)
+
+    def get_current_robot_state(self):
+        # 通过异步方式调用 service 获取当前的机器人状态
+        request = PrintPose.Request()
+        future = self._state_client.call_async(request)
+        self.get_logger().info('Calling print_current_pose service...')
+
+        # 设定回调，当服务完成时将调用此回调函数
+        future.add_done_callback(self.handle_robot_state_response)
+
+        # 等待服务响应成功，超时时间可以根据需求调整
+        timeout = 5  # 设定超时时间5秒
+        start_time = time.time()
+        while self.current_joint_angles is None and time.time() - start_time < timeout:
+            self.get_logger().info("Waiting for robot state response...")
+            time.sleep(0.1)
+
+    def handle_robot_state_response(self, future):
+        # 这个函数会在服务调用完成时被触发
+        self.get_logger().info('Service call completed.')
+
+        try:
+            # 获取服务响应数据
+            response = future.result()
+            self.current_robot_pose = response.pose  # 保存当前机器人的位姿
+            self.current_joint_angles = response.joint_angles  # 保存当前机器人的关节角度
+            self.get_logger().info(f"Current robot pose: {self.current_robot_pose}")
+            self.get_logger().info(f"Current joint angles: {self.current_joint_angles}")
+
+        except Exception as e:
+            self.get_logger().error(f'Failed to call print_current_pose service: {e}')
 
 def main(args=None):
     rclpy.init(args=args)
