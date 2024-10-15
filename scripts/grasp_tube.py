@@ -31,10 +31,10 @@ ToDos:
 - 机器人规划最短路径
     - 路径成本的评价
     - 等价路径的判断
-- 最快找到可行的x, z姿态
+- （Done）最快找到可行的x, z姿态: 通过加入参考姿态，计算相似度，选择最相似的姿态
 - 监测tube是否在机器人上
 - fine tune tube放置角度
-- 放置的高度需要改一下，不然会碰到已经放进去的tube
+- （Done）放置的高度需要改一下，不然会碰到已经放进去的tube
 BUG:
 - （Solved）第二次抓取时，tube姿态变成横着的了，没有变成直立： 由于机器人的位姿没有更新导致的
 '''
@@ -90,7 +90,7 @@ class GraspExecutor(Node):
         result = ExecuteGrasp.Result()
 
         if self.pose_array is None or goal_handle.request.tube_index >= len(self.pose_array.poses):
-            self.get_logger().warn('Invalid tube index or no pose array available for grasping.')
+            self.get_logger().error('Invalid tube index or no pose array available for grasping.')
             result.success = False
             goal_handle.abort()
             return result
@@ -109,7 +109,7 @@ class GraspExecutor(Node):
         执行具体的抓取操作的函数：根据tube的索引 (tube_index) 计算抓取姿态，接着将这些姿态转换到机器人坐标系中，最终调用动作序列执行函数，执行抓取任务。
         '''
         if self.pose_array is None:
-            self.get_logger().warn('No pose array available for grasping.')
+            self.get_logger().error('No pose array available for grasping.')
             return
 
         self.get_logger().info(f'Processing tube {tube_index}...')
@@ -126,23 +126,24 @@ class GraspExecutor(Node):
 
     def execute_action_sequence(self, pre_grasp_pose, grasp_pose, tube_index):
         # Grasp action sequence: Move to pre-grasp pose -> Close gripper -> Move to grasp pose -> Close gripper -> Move to pre-grasp pose
-        self.get_logger().info('Executing action sequence...')
+        self.get_logger().info('Executing grasping action sequence...')
         self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
-        self.get_logger().info('Pre-grasp pose reached.')
+        self.get_logger().debug('Pre-grasp pose reached.')
         self.send_gripper_goal(0.5)  # 关闭夹爪
-        self.get_logger().info('Gripper pre-closed.')
+        self.get_logger().debug('Gripper pre-closed.')
         self.send_pose_goal(grasp_pose, velocity_scaling=0.01)
-        self.get_logger().info('Grasp pose reached.')
+        self.get_logger().debug('Grasp pose reached.')
         self.send_gripper_goal(0.7)  # 关闭夹爪
-        self.get_logger().info('Tube grasped.')
+        self.get_logger().debug('Tube grasped.')
         self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.02)
-        self.get_logger().info('Pre-grasp pose reached.')
+        self.get_logger().debug('Pre-grasp pose reached.')
         
         # Add placing action here
+        self.get_logger().info('Executing placing action sequence...')
         target_placing_pose, placing_poses = self.calculate_placing_pose(tube_index)
         self.placing_tube(target_placing_pose, placing_poses, tube_index)
         # Return to pre-grasp pose
-        self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.02)
+        self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
         
     def calculate_placing_pose(self, tube_index):
         # 依据tube的当前姿态以及放置位置的可达性，实时计算放置tube的姿态
@@ -249,8 +250,6 @@ class GraspExecutor(Node):
 
             q_difference = quaternion_difference(desired_quaternion, [transformed_placing_pose.orientation.w, transformed_placing_pose.orientation.x, transformed_placing_pose.orientation.y, transformed_placing_pose.orientation.z])
             q_differences.append(abs(q_difference))
-            
-            self.get_logger().warning(f'The q_difference is {q_difference}.')
         
         # 按照相似度排序（q_difference 值越小越靠前）
         sorted_indices = sorted(range(len(q_differences)), key=lambda i: q_differences[i])
@@ -263,8 +262,9 @@ class GraspExecutor(Node):
     def placing_tube(self, target_placing_pose, placing_poses, tube_index):
         # 依次尝试每个候选的旋转四元数
         for i, placing_pose in enumerate(placing_poses):
-            self.get_logger().info(f'Trying pose {i}, the quaternion is {placing_pose}.')
+            self.get_logger().debug(f'Trying pose {i}, the quaternion is {placing_pose}.')
             
+            #### for debugging ####
             x=0.5178879634425592
             y=-0.4814145813368711
             z=0.5179544730306757
@@ -275,22 +275,21 @@ class GraspExecutor(Node):
             similarity = quaternion_difference(desired_quaternion, trying_quaternion)
             
             self.get_logger().warning(f'The similarity is {similarity}.')
+            #### for debugging ####
+            
             # 发送放置动作
             self.send_pose_goal(placing_pose, velocity_scaling=0.05)
-            self.get_logger().info(f'Trying pose {i}.')
             if self.action_succeeded:
                 break
 
-        # 微调试管的放置位置
-        # 确认试管当前的姿态是y轴朝上的
-        ## TODO
+        # 微调试管的放置位置和角度
         # 读取当前试管的位置
         while True:
             current_tube_pose = self.pose_array.poses[tube_index]
             offset_x = target_placing_pose.position.x - current_tube_pose.position.x
             offset_y = target_placing_pose.position.y - current_tube_pose.position.y
             offset_z = target_placing_pose.position.z - current_tube_pose.position.z
-            # TODO：除了检查位置，还需要检查姿态是否正确，有时会不
+            # TODO：除了检查位置，还需要检查姿态是否正确，有时会发生旋转的情况
             
             if (math.sqrt(offset_x**2 + offset_y**2 + offset_z**2)) > 0.001:
                 self.get_logger().info('Tube is not placed correctly. Adjusting...')
@@ -308,7 +307,6 @@ class GraspExecutor(Node):
                 transformed_placing_pose = self.transform_pose(robot_pose_in_isaac_world, 'isaac_world', 'world')
                 self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.005)
             else:
-                self.get_logger().info('Tube placed correctly.')
                 break
 
         transformed_placing_pose.position.z -= 0.1  # 将放置位置下移10cm
@@ -323,7 +321,7 @@ class GraspExecutor(Node):
         
         return transformed_placing_pose
 
-    def send_pose_goal(self, pose, velocity_scaling=0.01):
+    def send_pose_goal(self, pose, velocity_scaling=0.01, action_monitor=None):
         goal_msg = MoveToPoseAction.Goal()
         goal_msg.px = pose.position.x
         goal_msg.py = pose.position.y
@@ -343,6 +341,8 @@ class GraspExecutor(Node):
         while not self.robot_ready:
             self.get_logger().debug('Waiting for robot to reach the given pose...')
             time.sleep(0.1)
+            if action_monitor is not None:
+                action_monitor()
 
     def send_gripper_goal(self, target_position):
         goal_msg = MoveGripperAction.Goal()
@@ -363,7 +363,7 @@ class GraspExecutor(Node):
         goal_msg.joint_positions = joint_positions  # List of joint positions
         goal_msg.velocity_scaling = velocity_scaling
         
-        self.get_logger().info(f'Sending joint position goal: {joint_positions} with velocity scaling: {velocity_scaling}')
+        self.get_logger().debug(f'Sending joint position goal: {joint_positions} with velocity scaling: {velocity_scaling}')
         self.robot_ready = False
         self._joint_position_client.wait_for_server()
         self._send_joint_position_goal_future = self._joint_position_client.send_goal_async(goal_msg)
@@ -372,10 +372,10 @@ class GraspExecutor(Node):
     def generic_goal_response_callback(self, future, action_type="robot"):
         goal_handle = future.result()
         if not goal_handle.accepted:
-            self.get_logger().info('Goal rejected :(')
+            self.get_logger().error('Goal rejected :(')
             return
 
-        self.get_logger().info('Goal accepted :)')
+        self.get_logger().debug('Goal accepted :)')
         self._get_result_future = goal_handle.get_result_async()
         self._get_result_future.add_done_callback(lambda future: self.get_result_callback(future, action_type))
 
@@ -386,20 +386,20 @@ class GraspExecutor(Node):
             self.action_succeeded = True
             if action_type == "gripper":
                 self.gripper_ready = True  # 设置夹爪状态为准备好
-                self.get_logger().info('Gripper ready.')
+                self.get_logger().debug('Gripper ready.')
             elif action_type == "robot":
                 self.robot_ready = True  # 设置机器人状态为准备好
-                self.get_logger().info('Robot ready.')
+                self.get_logger().debug('Robot ready.')
             time.sleep(2)
         else:
             self.get_logger().info('Action failed!')
             self.action_succeeded = False
             if action_type == "gripper":
                 self.gripper_ready = True  # 设置夹爪状态为准备好
-                self.get_logger().info('Gripper ready.')
+                self.get_logger().debug('Gripper ready.')
             elif action_type == "robot":
                 self.robot_ready = True  # 设置机器人状态为准备好
-                self.get_logger().info('Robot ready.')
+                self.get_logger().debug('Robot ready.')
     
     ########################################
     ########## 以下是一些辅助函数 ############
@@ -416,7 +416,7 @@ class GraspExecutor(Node):
         # 通过异步方式调用 service 获取当前的机器人状态
         request = PrintPose.Request()
         future = self._state_client.call_async(request)
-        self.get_logger().info('Calling print_current_pose service...')
+        self.get_logger().debug('Calling print_current_pose service...')
 
         # 设定回调，当服务完成时将调用此回调函数
         future.add_done_callback(self.handle_robot_state_response)
@@ -425,7 +425,7 @@ class GraspExecutor(Node):
         timeout = 5  # 设定超时时间5秒
         start_time = time.time()
         while self.current_joint_angles is None and time.time() - start_time < timeout:
-            self.get_logger().info("Waiting for robot state response...")
+            self.get_logger().debug("Waiting for robot state response...")
             time.sleep(0.1)
         
         return None
@@ -450,7 +450,7 @@ class GraspExecutor(Node):
     
     def handle_robot_state_response(self, future):
         # 这个函数会在服务调用完成时被触发
-        self.get_logger().info('Service call completed.')
+        self.get_logger().debug('Service call completed.')
 
         try:
             # 获取服务响应数据
