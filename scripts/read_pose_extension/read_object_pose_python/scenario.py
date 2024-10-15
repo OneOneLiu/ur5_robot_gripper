@@ -97,9 +97,9 @@ class UR_Tube_Scenario:
         
         # Load the tube racks
         self.load_usd_assets(prim_path="/World/rack/rack1", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
-        self.set_object_transforms("/World/rack/rack1", (0.6, 0.32, 0.08), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
+        self.set_object_transforms("/World/rack/rack1", (0.6, 0.32, 0.065), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
         self.load_usd_assets(prim_path="/World/rack/rack2", usd_path="{}/rack/rack.usd".format(self.assests_root_path))
-        self.set_object_transforms("/World/rack/rack2", (0.6, -0.40, 0.08), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
+        self.set_object_transforms("/World/rack/rack2", (0.6, -0.40, 0.065), (0.0, 0.0, 0.0), (0.001, 0.001, 0.001))
         
         ## Load the tubes
         tube75_asset_path = "{}/tube75/tube75.usd".format(self.assests_root_path)
