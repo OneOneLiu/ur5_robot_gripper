@@ -15,6 +15,9 @@ from tf2_ros import Buffer, TransformListener
 import tf2_geometry_msgs
 from tf2_ros import TransformException
 
+from utils import construct_pose, pose_to_matrix, apply_transform
+from tube_pose_sub import PoseSubscriber
+
 # 备注：
 # 这个程序相对于原始的抓取管子程序进行了以下升级：
 # 1. 代码模块化：将订阅姿态信息和执行抓取操作分离成了两个独立的类（PoseSubscriber 和 GraspExecutor），提高了代码的可读性和可维护性。
@@ -22,90 +25,12 @@ from tf2_ros import TransformException
 # 3. 简化的动作执行流程：将抓取动作的多个步骤（如预抓取、夹取）整合为一个单一的动作序列执行函数 execute_action_sequence()，减少了代码冗余。
 # 4. 通用回调处理：统一了动作请求的回调处理，通过 generic_goal_response_callback() 和 get_result_callback() 简化了回调逻辑，减少了重复代码。
 
-def construct_pose(position, quaternion):
-    pose = Pose()
-    pose.position.x = position[0]
-    pose.position.y = position[1]
-    pose.position.z = position[2]
-    pose.orientation.w = quaternion[0]
-    pose.orientation.x = quaternion[1]
-    pose.orientation.y = quaternion[2]
-    pose.orientation.z = quaternion[3]
-    return pose
-
-def pose_to_matrix(pose):
-    # 提取平移
-    translation = np.array([pose.position.x, pose.position.y, pose.position.z])
-
-    # 提取四元数并转换为旋转矩阵
-    quaternion = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
-    rotation_matrix = quat2mat(quaternion)
-
-    # 构建4x4的变换矩阵
-    transform_matrix = np.eye(4)
-    transform_matrix[:3, :3] = rotation_matrix
-    transform_matrix[:3, 3] = translation
-
-    return transform_matrix
-
-def apply_transform(robot_pose, relative_transform):
-    # 将机器人的姿态转换为矩阵
-    robot_matrix = pose_to_matrix(robot_pose)
-
-    # 计算新的机器人姿态矩阵
-    new_robot_matrix = robot_matrix.dot(relative_transform)
-
-    # 提取新的平移和旋转
-    new_translation = new_robot_matrix[:3, 3]
-    new_rotation_matrix = new_robot_matrix[:3, :3]
-    
-    # 转换为四元数
-    from transforms3d.quaternions import mat2quat
-    new_quaternion = mat2quat(new_rotation_matrix)
-
-    # 构建新的 Pose
-    new_pose = Pose()
-    new_pose.position.x = new_translation[0]
-    new_pose.position.y = new_translation[1]
-    new_pose.position.z = new_translation[2]
-    new_pose.orientation.w = new_quaternion[0]
-    new_pose.orientation.x = new_quaternion[1]
-    new_pose.orientation.y = new_quaternion[2]
-    new_pose.orientation.z = new_quaternion[3]
-
-    return new_pose
-
-class PoseSubscriber(Node):
-    def __init__(self, grasp_executor):
-        super().__init__('pose_subscriber')
-        self.get_logger().info('PoseSubscriber node initialized.')
-
-        # 创建一个subscriber 订阅 /tube75_poses 话题
-        self.subscription = self.create_subscription(
-            PoseArray,
-            '/tube75_poses',
-            self.pose_callback,
-            10
-        )
-        self.get_logger().info('Subscribed to /tube75_poses topic.')
-        
-        # 将抓取执行器实例保存为属性
-        self.grasp_executor = grasp_executor
-        
-        self.robot_ready = True
-        self.gripper_ready = True
-
-    def pose_callback(self, msg):
-        self.get_logger().debug('Received and saved tube75 poses.')
-        # 将接收到的pose消息保存到抓取执行器中
-        self.grasp_executor.set_pose_array(msg)
-
 class GraspExecutor(Node):
     def __init__(self):
         super().__init__('grasp_executor')
         self.get_logger().info('GraspExecutor node initialized.')
 
-        # 创建action client
+        # 创建action client: 移动到指定位姿，夹取动作，移动到指定关节角度
         self._pose_client = ActionClient(self, MoveToPoseAction, 'move_to_pose_action')
         self._gripper_client = ActionClient(self, MoveGripperAction, 'move_gripper_action')
         self._joint_position_client = ActionClient(self, MoveToJointPosition, 'move_to_joint_position_action')  # Added Action Client for MoveToJointPosition
@@ -115,11 +40,11 @@ class GraspExecutor(Node):
         while not self._state_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Waiting for print_current_pose service to become available...')
         
-        # 创建一个tf2 listener
+        # 创建一个tf2 listener，用于坐标变换
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         
-        # 创建一个action server，用于手动触发抓取某个tube的流程
+        # 创建抓取tube的 action server，用于手动触发抓取某个tube的流程 （主要循环功能）
         self._grasp_action_server = ActionServer(
             self,
             ExecuteGrasp,
@@ -133,13 +58,17 @@ class GraspExecutor(Node):
         # 存储当前机器人的位姿和关节角度
         self.current_joint_angles = None
         
+        # 初始化机器人和夹爪的状态
+        self.robot_ready = True
+        self.gripper_ready = True
         self.action_succeeded = True
 
-    def set_pose_array(self, pose_array):
-        self.pose_array = pose_array
-        self.get_logger().debug('Pose array updated.')
-    
     def execute_grasp_callback(self, goal_handle):
+        '''
+        _grasp_action_server请求的回调函数，用于执行抓取某个tube的动作
+        args: goal_handle: action 提供的 goal_handle，包含了抓取任务请求的所有相关信息。本请求中具体包括：
+            goal_handle.request.tube_index：表示要抓取的管子的索引（整数类型）
+        '''
         self.get_logger().info(f'Executing grasp action for tube index {goal_handle.request.tube_index}...')
         result = ExecuteGrasp.Result()
 
@@ -148,84 +77,38 @@ class GraspExecutor(Node):
             result.success = False
             goal_handle.abort()
             return result
-
+        
+        # 调用抓取函数执行抓取动作
         self.execute_grasp(goal_handle.request.tube_index)
         goal_handle.succeed()
-
+        
         # 动作成功完成，设置 success 为 True
         result.success = True
+        
         return result
 
     def execute_grasp(self, tube_index):
+        '''
+        执行具体的抓取操作的函数：根据tube的索引 (tube_index) 计算抓取姿态，接着将这些姿态转换到机器人坐标系中，最终调用动作序列执行函数，执行抓取任务。
+        '''
         if self.pose_array is None:
             self.get_logger().warn('No pose array available for grasping.')
             return
 
         self.get_logger().info(f'Processing tube {tube_index}...')
-        pre_grasp_pose, grasp_pose = self.calculate_grasping_poses(self.pose_array.poses[tube_index])
 
+        # 计算预抓取和抓取姿态
+        pre_grasp_pose, grasp_pose = self.calculate_grasping_poses(self.pose_array.poses[tube_index])
+        
+        # 将姿态转换到机器人坐标系中
         transformed_pre_grasp_pose = self.transform_pose(pre_grasp_pose, 'isaac_world', 'world')
         transformed_grasp_pose = self.transform_pose(grasp_pose, 'isaac_world', 'world')
-        
-        # re_oriented_pose = self.calculate_placing_poses(transformed_pre_grasp_pose)
-        # transformed_re_oriented_pose = self.transform_pose(re_oriented_pose, 'isaac_world', 'world')
-        transformed_re_oriented_pose = None
 
         # 执行抓取动作
-        self.execute_action_sequence(transformed_pre_grasp_pose, transformed_grasp_pose, transformed_re_oriented_pose, tube_index)
-
-    def calculate_grasping_poses(self, pose):
-        # 实现与原代码相似的逻辑来计算pre-grasp和grasp的位姿
-        q = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
-        rotation_matrix = quat2mat(q)
-        cylinder_y_axis = rotation_matrix[:, 1]
-        up_direction = np.array([0, 0, 1])
-        vector_horiz = np.cross(cylinder_y_axis, up_direction)
-        vector_horiz = vector_horiz / np.linalg.norm(vector_horiz)
-        result_vector = np.cross(vector_horiz, cylinder_y_axis)
-        result_vector = result_vector / np.linalg.norm(result_vector)
-        opposite_vector = -result_vector
-        rotation_matrix_opposite = np.column_stack((vector_horiz, -cylinder_y_axis, opposite_vector))
-        quaternion_opposite = mat2quat(rotation_matrix_opposite)
-        
-        cylinder_center = np.array([pose.position.x, pose.position.y, pose.position.z])
-        pre_grasp_point = cylinder_center + result_vector * 0.1 + cylinder_y_axis * 0.05
-        grasp_point = cylinder_center + result_vector * 0.0 + cylinder_y_axis * 0.05
-        
-        pre_grasp_pose = construct_pose(pre_grasp_point, quaternion_opposite)
-        grasp_pose = construct_pose(grasp_point, quaternion_opposite)
-
-        return pre_grasp_pose, grasp_pose
-    
-    def calculate_placing_poses(self, pose = None):
-        # 先获取当前机器人的状态
-        self.get_current_robot_state()
-
-        # 假设已经获取到了self.current_joint_angles，并使用它来进行计算
-        if self.current_joint_angles is not None:
-            # Modify the 6th joint angle to rotate it 90 degrees clockwise (i.e., -π/2 radians)
-            new_joint_angles = self.current_joint_angles[:]
-            new_joint_angles[5] -= math.pi / 4  # Rotate the 6th joint 90 degrees clockwise
-
-            self.get_logger().info(f"Modified joint angles with 6th joint rotated: {new_joint_angles}")
-
-            return new_joint_angles
-        else:
-            self.get_logger().warning('Current joint angles not available yet!')
-            return None
+        self.execute_action_sequence(transformed_pre_grasp_pose, transformed_grasp_pose, tube_index)
 
 
-    def transform_pose(self, pose, source_frame, target_frame):
-        while True:
-            try:
-                t = self.tf_buffer.lookup_transform(target_frame, source_frame, rclpy.time.Time())
-                break
-            except TransformException as ex:
-                self.get_logger().debug(f'Could not transform {source_frame} to {target_frame}: {ex}')
-        transformed_pose = tf2_geometry_msgs.do_transform_pose(pose, t)
-        return transformed_pose
-
-    def execute_action_sequence(self, pre_grasp_pose, grasp_pose, re_oriented_pose, tube_index):
+    def execute_action_sequence(self, pre_grasp_pose, grasp_pose, tube_index):
         # Consolidate sending goals and handling callbacks into a single function
         self.get_logger().info('Executing action sequence...')
         self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
@@ -236,7 +119,7 @@ class GraspExecutor(Node):
         self.get_logger().info('Grasp pose reached.')
         self.send_gripper_goal(0.7)  # 关闭夹爪
         self.get_logger().info('Tube grasped.')
-        self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.05)
+        self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.02)
         self.get_logger().info('Pre-grasp pose reached.')
         # array('d', [-1.536058644578639, -1.2418357984149566, 1.622218157889908, -1.972800967355929, -1.5932304181778447, 0.019746842630313566])
         # geometry_msgs.msg.Pose(position=geometry_msgs.msg.Point(x=0.35140546093353975, y=-0.6029201291432347, z=0.3716432330812862), orientation=geometry_msgs.msg.Quaternion(x=0.5178879634425592, y=-0.4814145813368711, z=0.5179544730306757, w=-0.48140961983022185))
@@ -346,13 +229,13 @@ class GraspExecutor(Node):
                 robot_pose_in_isaac_world.position.z += offset_z
                 
                 transformed_placing_pose = self.transform_pose(robot_pose_in_isaac_world, 'isaac_world', 'world')
-                self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.05)
+                self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.005)
             else:
                 self.get_logger().info('Tube placed correctly.')
                 break
-        
-        transformed_placing_pose.position.z -= 0.08  # 将放置位置下移5cm
-        self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.01)
+
+        transformed_placing_pose.position.z -= 0.1  # 将放置位置下移9cm
+        self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.003)
         self.send_gripper_goal(0.5)  # 打开夹爪
         self.get_logger().info('Tube placed.')
         
@@ -374,7 +257,7 @@ class GraspExecutor(Node):
         self._pose_client.wait_for_server()
         self._send_goal_future = self._pose_client.send_goal_async(goal_msg)
         self._send_goal_future.add_done_callback(lambda future: self.generic_goal_response_callback(future, action_type="robot"))
-        
+
         while not self.robot_ready:
             self.get_logger().debug('Waiting for robot to reach the given pose...')
             time.sleep(0.1)
@@ -388,6 +271,7 @@ class GraspExecutor(Node):
         self._gripper_client.wait_for_server()
         self._send_gripper_goal_future = self._gripper_client.send_goal_async(goal_msg)
         self._send_gripper_goal_future.add_done_callback(lambda future: self.generic_goal_response_callback(future, action_type="gripper"))
+
         while not self.gripper_ready:
             self.get_logger().debug('Waiting for gripper to reach the target position...')
             time.sleep(0.1)
@@ -434,7 +318,16 @@ class GraspExecutor(Node):
             elif action_type == "robot":
                 self.robot_ready = True  # 设置机器人状态为准备好
                 self.get_logger().info('Robot ready.')
-
+    
+    ########################################
+    ########## 以下是一些辅助函数 ############
+    ########################################
+    # 用于设置姿态数组
+    def set_pose_array(self, pose_array):
+        self.pose_array = pose_array
+        self.get_logger().debug('Pose array updated.')
+    
+    # 获取当前机器人的位姿
     def get_current_robot_state(self):
         # 通过异步方式调用 service 获取当前的机器人状态
         request = PrintPose.Request()
@@ -450,7 +343,7 @@ class GraspExecutor(Node):
         while self.current_joint_angles is None and time.time() - start_time < timeout:
             self.get_logger().info("Waiting for robot state response...")
             time.sleep(0.1)
-
+        return None
     def handle_robot_state_response(self, future):
         # 这个函数会在服务调用完成时被触发
         self.get_logger().info('Service call completed.')
@@ -462,9 +355,74 @@ class GraspExecutor(Node):
             self.current_joint_angles = response.joint_angles  # 保存当前机器人的关节角度
             self.get_logger().info(f"Current robot pose: {self.current_robot_pose}")
             self.get_logger().info(f"Current joint angles: {self.current_joint_angles}")
+            
+            return None
 
         except Exception as e:
             self.get_logger().error(f'Failed to call print_current_pose service: {e}')
+            
+            return None
+    
+    # 姿态变换函数
+    def transform_pose(self, pose, source_frame, target_frame):
+        while True:
+            try:
+                t = self.tf_buffer.lookup_transform(target_frame, source_frame, rclpy.time.Time())
+                break
+            except TransformException as ex:
+                self.get_logger().debug(f'Could not transform {source_frame} to {target_frame}: {ex}')
+        transformed_pose = tf2_geometry_msgs.do_transform_pose(pose, t)
+        return transformed_pose
+    
+    def calculate_grasping_poses(self, pose):
+        '''
+        根据输入的管子姿态 (Pose) 计算抓取和预抓取的姿态。该函数会根据管子的当前方向和位置，计算出两个姿态：
+        - 预抓取姿态：机器人在执行抓取动作之前的准备位置。
+        - 抓取姿态：机器人执行抓取动作时的具体位置。
+
+        args: pose (geometry_msgs.msg.Pose): 待抓取tube的姿态。
+        
+        return: pre_grasp_pose, grasp_pose
+        '''
+        # 从管子的姿态中提取位置和四元数, 并使用 quat2mat 将其转换为 3x3 旋转矩阵，以方便后续的几何计算。
+        q = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
+        rotation_matrix = quat2mat(q)
+        
+        ###################################
+        # 以下是计算预抓取和抓取姿态的具体步骤
+        ###################################
+        
+        # 提取tube的当前 y 轴方向 （主轴方向），设定世界坐标系中的 z 轴方向
+        tube_y_axis = rotation_matrix[:, 1]
+        world_z_direction = np.array([0, 0, 1])
+        
+        # 计算 tube y 轴与世界 z 轴的叉乘，得到一个垂直于 tube y 轴和世界 z 轴的水平向量，随后正则化
+        vector_horiz = np.cross(tube_y_axis, world_z_direction)
+        vector_horiz = vector_horiz / np.linalg.norm(vector_horiz)
+        
+        # 计算 tube y 轴与水平向量的叉乘，得到一个垂直于 tube y 轴和水平向量的向量 (在tube倾斜或者平躺时，这个方向是近似向上的)
+        up_from_tube_vector = np.cross(vector_horiz, tube_y_axis)
+        up_from_tube_vector = up_from_tube_vector / np.linalg.norm(up_from_tube_vector)
+        
+        # 对上一个向量取反，就是抓取时的接近向量，随后将其与水平向量和 tube y 轴组合成一个新的旋转矩阵，作为机器人末端位姿
+        approach_vector = -up_from_tube_vector
+        approach_rotation_matrix = np.column_stack((vector_horiz, -tube_y_axis, approach_vector))
+        approach_quaternion = mat2quat(approach_rotation_matrix)
+        
+        # 计算抓取和预抓取的位置, 使用tube的原点位置加上给定方向上的偏移量
+        # tube 的原点位置位于玻璃部分最底端
+        tube_origin = np.array([pose.position.x, pose.position.y, pose.position.z])
+        pre_grasp_point = tube_origin + up_from_tube_vector * 0.1 + tube_y_axis * 0.07 # 对于 75mm 长的管子，7 cm 可以抓取到盖子
+        grasp_point = tube_origin + up_from_tube_vector * 0.0 + tube_y_axis * 0.07
+        
+        pre_grasp_pose = construct_pose(pre_grasp_point, approach_quaternion)
+        grasp_pose = construct_pose(grasp_point, approach_quaternion)
+
+        return pre_grasp_pose, grasp_pose
+    
+    ########################################
+    ########## 以上是一些辅助函数 ############
+    ########################################
 
 def main(args=None):
     rclpy.init(args=args)
