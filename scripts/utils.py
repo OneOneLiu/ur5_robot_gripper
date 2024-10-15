@@ -1,19 +1,8 @@
 #!/usr/bin/env python3
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import PoseArray, Pose
-from std_srvs.srv import Trigger
-from ur5_robot_gripper.action import MoveToPositionAction, MoveToPoseAction, MoveGripperAction, ExecuteGrasp, MoveToJointPosition
-from ur5_robot_gripper.srv import PrintPose
-from rclpy.action import ActionClient, ActionServer
-import time
+from geometry_msgs.msg import Pose
 import numpy as np
-import math
+from math import acos, degrees
 from transforms3d.quaternions import quat2mat, mat2quat
-from transforms3d.axangles import axangle2mat
-from tf2_ros import Buffer, TransformListener
-import tf2_geometry_msgs
-from tf2_ros import TransformException
 
 def construct_pose(position, quaternion):
     pose = Pose()
@@ -67,3 +56,18 @@ def apply_transform(robot_pose, relative_transform):
     new_pose.orientation.z = new_quaternion[3]
 
     return new_pose
+
+def quaternion_difference(q1, q2):
+    # 计算四元数的点积
+    dot_product = np.dot(q1, q2)
+    
+    # 确保点积值在 [-1, 1] 范围内，避免由于浮点数误差引起的问题
+    dot_product = np.clip(dot_product, -1.0, 1.0)
+    
+    # 计算旋转角度差异（弧度）
+    angle_diff = 2 * acos(abs(dot_product))
+    
+    # 转换为角度
+    angle_diff_degrees = degrees(angle_diff)
+    
+    return angle_diff_degrees
