@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import PoseArray, Pose
-from std_srvs.srv import Trigger
-from ur5_robot_gripper.action import MoveToPositionAction, MoveToPoseAction, MoveGripperAction, ExecuteGrasp, MoveToJointPosition
-from ur5_robot_gripper.srv import PrintPose
-from rclpy.action import ActionClient, ActionServer
 import time
 import numpy as np
 import math
+
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Pose
+from std_srvs.srv import Trigger
+from rclpy.action import ActionClient, ActionServer
 from transforms3d.quaternions import quat2mat, mat2quat
 from transforms3d.axangles import axangle2mat
 from tf2_ros import Buffer, TransformListener
 import tf2_geometry_msgs
 from tf2_ros import TransformException
 
-from utils import construct_pose, pose_to_matrix, apply_transform
+from ur5_robot_gripper.action import MoveToPositionAction, MoveToPoseAction, MoveGripperAction, ExecuteGrasp, MoveToJointPosition
+from ur5_robot_gripper.srv import PrintPose
+from utils import construct_pose, pose_to_matrix, apply_transform, quaternion_difference
 from tube_pose_sub import PoseSubscriber
 
 # 备注：
@@ -129,7 +130,7 @@ class GraspExecutor(Node):
         self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
         self.get_logger().info('Pre-grasp pose reached.')
         self.send_gripper_goal(0.5)  # 关闭夹爪
-        self.get_logger().info('Gripper closed.')
+        self.get_logger().info('Gripper pre-closed.')
         self.send_pose_goal(grasp_pose, velocity_scaling=0.01)
         self.get_logger().info('Grasp pose reached.')
         self.send_gripper_goal(0.7)  # 关闭夹爪
@@ -140,24 +141,8 @@ class GraspExecutor(Node):
         # Add placing action here
         target_placing_pose, placing_poses = self.calculate_placing_pose(tube_index)
         self.placing_tube(target_placing_pose, placing_poses, tube_index)
-    
-    def check_rack_avalaibility(self):
-        # 读取self.rack_occupancy，找到第一个不为1的位置，返回该位置的坐标
-        for i in range(6):
-            for j in range(15):
-                if self.rack_occupancy[i, j] == 0:
-                    break
-            if self.rack_occupancy[i, j] == 0:
-                break
-            
-        hole_index = (i, j)
-        hole_x = 0.60 - 0.016 * j # 0.60是第一个孔的x坐标，0.016是孔之间的间隔
-        hole_y = 0.401 - 0.016 * i # 0.40是第一个孔的y坐标，0.016是孔之间的间隔
-        hole_z = 0.065
-        
-        self.in_used_hole_index = hole_index
-        
-        return hole_x, hole_y, hole_z
+        # Return to pre-grasp pose
+        self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.02)
         
     def calculate_placing_pose(self, tube_index):
         # 依据tube的当前姿态以及放置位置的可达性，实时计算放置tube的姿态
@@ -243,6 +228,13 @@ class GraspExecutor(Node):
         # 计算robot-tube相对变换矩阵
         relative_transform = np.linalg.inv(robot_matrix).dot(tube_matrix)
         
+        # 设置一个有倾向的四元数，用于后续计算相似度
+        d_x=0.5178879634425592
+        d_y=-0.4814145813368711
+        d_z=0.5179544730306757
+        d_w=-0.48140961983022185
+        desired_quaternion = [d_w, d_x, d_y, d_z]
+        q_differences = []
         # 生成机器人姿态候选
         transformed_placing_poses = []
         for candidate_quaternion in candidate_quaternions:
@@ -254,14 +246,35 @@ class GraspExecutor(Node):
             
             transformed_placing_pose = self.transform_pose(new_robot_pose, 'isaac_world', 'world')
             transformed_placing_poses.append(transformed_placing_pose)
+
+            q_difference = quaternion_difference(desired_quaternion, [transformed_placing_pose.orientation.w, transformed_placing_pose.orientation.x, transformed_placing_pose.orientation.y, transformed_placing_pose.orientation.z])
+            q_differences.append(abs(q_difference))
+            
+            self.get_logger().warning(f'The q_difference is {q_difference}.')
         
-        return target_placing_pose, transformed_placing_poses
+        # 按照相似度排序（q_difference 值越小越靠前）
+        sorted_indices = sorted(range(len(q_differences)), key=lambda i: q_differences[i])
+
+        # 根据排序后的索引重新排列姿态和四元数
+        sorted_transformed_placing_poses = [transformed_placing_poses[i] for i in sorted_indices]
+        
+        return target_placing_pose, sorted_transformed_placing_poses
             
     def placing_tube(self, target_placing_pose, placing_poses, tube_index):
         # 依次尝试每个候选的旋转四元数
         for i, placing_pose in enumerate(placing_poses):
             self.get_logger().info(f'Trying pose {i}, the quaternion is {placing_pose}.')
             
+            x=0.5178879634425592
+            y=-0.4814145813368711
+            z=0.5179544730306757
+            w=-0.48140961983022185
+            desired_quaternion = [w, x, y, z]
+            trying_quaternion = [placing_pose.orientation.w, placing_pose.orientation.x, placing_pose.orientation.y, placing_pose.orientation.z]
+            
+            similarity = quaternion_difference(desired_quaternion, trying_quaternion)
+            
+            self.get_logger().warning(f'The similarity is {similarity}.')
             # 发送放置动作
             self.send_pose_goal(placing_pose, velocity_scaling=0.05)
             self.get_logger().info(f'Trying pose {i}.')
@@ -298,11 +311,15 @@ class GraspExecutor(Node):
                 self.get_logger().info('Tube placed correctly.')
                 break
 
-        transformed_placing_pose.position.z -= 0.1  # 将放置位置下移9cm
+        transformed_placing_pose.position.z -= 0.1  # 将放置位置下移10cm
         self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.003)
         self.send_gripper_goal(0.5)  # 打开夹爪
         self.get_logger().info('Tube placed.')
         self.rack_occupancy[self.in_used_hole_index] = 1  # 更新rack上的占用情况
+        
+        # 返回到初始位置
+        transformed_placing_pose.position.z += 0.1  # 将放置位置下移10cm
+        self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.003)
         
         return transformed_placing_pose
 
@@ -412,6 +429,24 @@ class GraspExecutor(Node):
             time.sleep(0.1)
         
         return None
+    
+    def check_rack_avalaibility(self):
+        # 读取self.rack_occupancy，找到第一个不为1的位置，返回该位置的坐标
+        for i in range(6):
+            for j in range(15):
+                if self.rack_occupancy[i, j] == 0:
+                    break
+            if self.rack_occupancy[i, j] == 0:
+                break
+            
+        hole_index = (i, j)
+        hole_x = 0.60 - 0.016 * i # 0.60是第一个孔的x坐标，0.016是孔之间的间隔
+        hole_y = 0.401 - 0.016 * j # 0.40是第一个孔的y坐标，0.016是孔之间的间隔
+        hole_z = 0.065
+        
+        self.in_used_hole_index = hole_index
+        
+        return hole_x, hole_y, hole_z
     
     def handle_robot_state_response(self, future):
         # 这个函数会在服务调用完成时被触发
