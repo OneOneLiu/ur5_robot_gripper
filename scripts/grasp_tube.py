@@ -25,6 +25,19 @@ from tube_pose_sub import PoseSubscriber
 # 3. 简化的动作执行流程：将抓取动作的多个步骤（如预抓取、夹取）整合为一个单一的动作序列执行函数 execute_action_sequence()，减少了代码冗余。
 # 4. 通用回调处理：统一了动作请求的回调处理，通过 generic_goal_response_callback() 和 get_result_callback() 简化了回调逻辑，减少了重复代码。
 
+'''
+ToDos:
+- 机器人规划最短路径
+    - 路径成本的评价
+    - 等价路径的判断
+- 最快找到可行的x, z姿态
+- 监测tube是否在机器人上
+- fine tune tube放置角度
+- 放置的高度需要改一下，不然会碰到已经放进去的tube
+BUG:
+- （Solved）第二次抓取时，tube姿态变成横着的了，没有变成直立： 由于机器人的位姿没有更新导致的
+'''
+
 class GraspExecutor(Node):
     def __init__(self):
         super().__init__('grasp_executor')
@@ -62,6 +75,9 @@ class GraspExecutor(Node):
         self.robot_ready = True
         self.gripper_ready = True
         self.action_succeeded = True
+        
+        # 初始化rack上的占用情况
+        self.rack_occupancy = np.zeros((6, 15))  # 6x15的矩阵，表示rack上每个位置的占用情况
 
     def execute_grasp_callback(self, goal_handle):
         '''
@@ -107,9 +123,8 @@ class GraspExecutor(Node):
         # 执行抓取动作
         self.execute_action_sequence(transformed_pre_grasp_pose, transformed_grasp_pose, tube_index)
 
-
     def execute_action_sequence(self, pre_grasp_pose, grasp_pose, tube_index):
-        # Consolidate sending goals and handling callbacks into a single function
+        # Grasp action sequence: Move to pre-grasp pose -> Close gripper -> Move to grasp pose -> Close gripper -> Move to pre-grasp pose
         self.get_logger().info('Executing action sequence...')
         self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.07)
         self.get_logger().info('Pre-grasp pose reached.')
@@ -121,32 +136,64 @@ class GraspExecutor(Node):
         self.get_logger().info('Tube grasped.')
         self.send_pose_goal(pre_grasp_pose, velocity_scaling=0.02)
         self.get_logger().info('Pre-grasp pose reached.')
-        # array('d', [-1.536058644578639, -1.2418357984149566, 1.622218157889908, -1.972800967355929, -1.5932304181778447, 0.019746842630313566])
-        # geometry_msgs.msg.Pose(position=geometry_msgs.msg.Point(x=0.35140546093353975, y=-0.6029201291432347, z=0.3716432330812862), orientation=geometry_msgs.msg.Quaternion(x=0.5178879634425592, y=-0.4814145813368711, z=0.5179544730306757, w=-0.48140961983022185))
-        # pre_placing_joint_angles = [-math.pi/2, -1.2418357984149566, math.pi/2, -1.972800967355929, 0.0000, -math.pi/2]
-        # self.send_joint_position_goal(pre_placing_joint_angles, velocity_scaling=0.05)
-        # self.get_logger().info('Action sequence completed.')
         
         # Add placing action here
-        self.placing_tube(tube_index)
-
-    def placing_tube(self, tube_index):
-        # 设定放置管子的位置，姿态在后面生成
-        placing_pose = Pose()
-        placing_pose.position.x = 0.6
-        placing_pose.position.y = 0.32
-        placing_pose.position.z = 0.08 + 0.05 # 设定位置为孔的第一个位置上方5cm
+        target_placing_pose, placing_poses = self.calculate_placing_pose(tube_index)
+        self.placing_tube(target_placing_pose, placing_poses, tube_index)
+    
+    def check_rack_avalaibility(self):
+        # 读取self.rack_occupancy，找到第一个不为1的位置，返回该位置的坐标
+        for i in range(6):
+            for j in range(15):
+                if self.rack_occupancy[i, j] == 0:
+                    break
+            if self.rack_occupancy[i, j] == 0:
+                break
+            
+        hole_index = (i, j)
+        hole_x = 0.60 - 0.016 * j # 0.60是第一个孔的x坐标，0.016是孔之间的间隔
+        hole_y = 0.401 - 0.016 * i # 0.40是第一个孔的y坐标，0.016是孔之间的间隔
+        hole_z = 0.065
         
-        # 获取当前管子的姿态
+        self.in_used_hole_index = hole_index
+        
+        return hole_x, hole_y, hole_z
+        
+    def calculate_placing_pose(self, tube_index):
+        # 依据tube的当前姿态以及放置位置的可达性，实时计算放置tube的姿态
+        
+        ###################################
+        # 1. 一些预设
+        ###################################
+        # 设定放置管子的位置，姿态在后面生成
+        ## 根据rack上的位置占用情况，先找到一个第一个空的位置
+        hole_x, hole_y, hole_z = self.check_rack_avalaibility()
+        target_placing_pose = Pose()
+        target_placing_pose.position.x = hole_x
+        target_placing_pose.position.y = hole_y
+        target_placing_pose.position.z = hole_z + 0.05 # 设定位置为孔的第一个位置上方5cm
+        
+        # target_placing_pose = Pose()
+        # target_placing_pose.position.x = 0.60
+        # target_placing_pose.position.y = 0.32
+        # target_placing_pose.position.z = 0.08 + 0.05 # 设定位置为孔的第一个位置上方5cm
+        
+        # 获取当前管子的姿态并转换成旋转矩阵
         current_tube_pose = self.pose_array.poses[tube_index]
         current_tube_rotation_matrix = quat2mat([current_tube_pose.orientation.w,
                                             current_tube_pose.orientation.x,
                                             current_tube_pose.orientation.y,
                                             current_tube_pose.orientation.z])
+        
+        # 提取当前管子的 y 轴方向，并设定目标方向为cap向上直立（与世界z轴重合）
         current_y_axis = current_tube_rotation_matrix[:, 1]  # 当前的 y 轴方向
         target_y_axis = np.array([0, 0, 1])  # 目标 y 轴是世界坐标系中的 z 轴
         
+        ###################################
+        # 2. 计算如何进行y轴旋转
+        ###################################
         # 通过轴角方式计算将当前 y 轴旋转到目标 y 轴 (世界坐标系z轴) 的旋转矩阵
+        
         # 先计算旋转轴
         rotation_axis = np.cross(current_y_axis, target_y_axis)
         if np.linalg.norm(rotation_axis) > 1e-6:  # 避免零向量的情况
@@ -161,7 +208,11 @@ class GraspExecutor(Node):
         # 将当前表示姿态的旋转矩阵与上面求到的旋转矩阵相乘 -> 得到的就是立着的管子的旋转矩阵（姿态）
         tube_y_2_world_z_rotation_matrix = np.dot(rotation_matrix_to_target_y, current_tube_rotation_matrix) # np.dot(R1, R2)：这表示先执行 R2 的旋转，然后执行 R1 的旋转。
         
-        ## tube y轴与世界z轴对齐，tube的 x, z轴可以绕世界z轴旋转，下面生成一组候选的旋转，机器人执行时挨个去试
+        ###################################
+        # 3. 生成x, z轴候选
+        ###################################
+        # x,z 轴没有特别要求，所以生成一组候选的旋转矩阵，后续从中实验选择
+        
         # 创建一个数组存储所有候选的旋转四元数
         candidate_quaternions = []
         ## 下面需要生成一组候选的，具有不同的x,z轴旋转的旋转矩阵
@@ -173,10 +224,15 @@ class GraspExecutor(Node):
             final_rotation_matrix = np.dot(rotation_matrix, tube_y_2_world_z_rotation_matrix) 
             final_quaternion = mat2quat(final_rotation_matrix)
             candidate_quaternions.append(final_quaternion)
-
-        # 上面求得的旋转矩阵表示试管应当如何进行旋转，才能使得它立着，后面把它变换成机器人的旋转矩阵
+        
+        ###################################
+        # 4. 求解机器人姿态
+        ###################################
+        # 前述三步求得的是tube的姿态，下面将其转变为控制机器人所需的姿态
+        
         # 获取当前机器人的位姿
         self.get_current_robot_state()
+        time.sleep(1)
         robot_pose = self.current_robot_pose
         robot_pose_in_isaac_world = self.transform_pose(robot_pose, 'world', 'isaac_world')
 
@@ -184,35 +240,43 @@ class GraspExecutor(Node):
         robot_matrix = pose_to_matrix(robot_pose_in_isaac_world)
         tube_matrix = pose_to_matrix(current_tube_pose)
         
-        # 计算相对变换矩阵
+        # 计算robot-tube相对变换矩阵
         relative_transform = np.linalg.inv(robot_matrix).dot(tube_matrix)
         
-        # 依次尝试每个候选的旋转四元数
-        for i, candidate_quaternion in enumerate(candidate_quaternions):
-            self.get_logger().info(f'Trying pose {i}, the quaternion is {candidate_quaternion}.')
-            placing_pose.orientation.w = candidate_quaternion[0]
-            placing_pose.orientation.x = candidate_quaternion[1]
-            placing_pose.orientation.y = candidate_quaternion[2]
-            placing_pose.orientation.z = candidate_quaternion[3]
-            new_robot_pose = apply_transform(placing_pose, relative_transform) # 这个的平移是对的
+        # 生成机器人姿态候选
+        transformed_placing_poses = []
+        for candidate_quaternion in candidate_quaternions:
+            target_placing_pose.orientation.w = candidate_quaternion[0]
+            target_placing_pose.orientation.x = candidate_quaternion[1]
+            target_placing_pose.orientation.y = candidate_quaternion[2]
+            target_placing_pose.orientation.z = candidate_quaternion[3]
+            new_robot_pose = apply_transform(target_placing_pose, relative_transform)
             
             transformed_placing_pose = self.transform_pose(new_robot_pose, 'isaac_world', 'world')
+            transformed_placing_poses.append(transformed_placing_pose)
+        
+        return target_placing_pose, transformed_placing_poses
+            
+    def placing_tube(self, target_placing_pose, placing_poses, tube_index):
+        # 依次尝试每个候选的旋转四元数
+        for i, placing_pose in enumerate(placing_poses):
+            self.get_logger().info(f'Trying pose {i}, the quaternion is {placing_pose}.')
             
             # 发送放置动作
-            self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.05)
+            self.send_pose_goal(placing_pose, velocity_scaling=0.05)
             self.get_logger().info(f'Trying pose {i}.')
             if self.action_succeeded:
                 break
-        
+
         # 微调试管的放置位置
         # 确认试管当前的姿态是y轴朝上的
         ## TODO
         # 读取当前试管的位置
         while True:
             current_tube_pose = self.pose_array.poses[tube_index]
-            offset_x = placing_pose.position.x - current_tube_pose.position.x
-            offset_y = placing_pose.position.y - current_tube_pose.position.y
-            offset_z = placing_pose.position.z - current_tube_pose.position.z
+            offset_x = target_placing_pose.position.x - current_tube_pose.position.x
+            offset_y = target_placing_pose.position.y - current_tube_pose.position.y
+            offset_z = target_placing_pose.position.z - current_tube_pose.position.z
             # TODO：除了检查位置，还需要检查姿态是否正确，有时会不
             
             if (math.sqrt(offset_x**2 + offset_y**2 + offset_z**2)) > 0.001:
@@ -238,6 +302,7 @@ class GraspExecutor(Node):
         self.send_pose_goal(transformed_placing_pose, velocity_scaling=0.003)
         self.send_gripper_goal(0.5)  # 打开夹爪
         self.get_logger().info('Tube placed.')
+        self.rack_occupancy[self.in_used_hole_index] = 1  # 更新rack上的占用情况
         
         return transformed_placing_pose
 
@@ -326,6 +391,8 @@ class GraspExecutor(Node):
     def set_pose_array(self, pose_array):
         self.pose_array = pose_array
         self.get_logger().debug('Pose array updated.')
+        
+        return None
     
     # 获取当前机器人的位姿
     def get_current_robot_state(self):
@@ -343,7 +410,9 @@ class GraspExecutor(Node):
         while self.current_joint_angles is None and time.time() - start_time < timeout:
             self.get_logger().info("Waiting for robot state response...")
             time.sleep(0.1)
+        
         return None
+    
     def handle_robot_state_response(self, future):
         # 这个函数会在服务调用完成时被触发
         self.get_logger().info('Service call completed.')
