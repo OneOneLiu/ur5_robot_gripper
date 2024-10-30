@@ -142,7 +142,7 @@ bool RobotMover::executePlan(double velocity_scaling)
   auto execute_status = move_group_interface_.execute(plan);
 
   // 检查执行状态
-  if (execute_status != moveit::planning_interface::MoveItErrorCode::SUCCESS) {
+  if (execute_status != moveit::core::MoveItErrorCode::SUCCESS) {
     RCLCPP_ERROR(rclcpp::get_logger("robot_control"), "Execution failed!");
     return false;  // 执行失败，返回 false
   }
@@ -189,7 +189,7 @@ void RobotMover::handleMovePositionRequest(const std::shared_ptr<ur5_robot_gripp
     }
 
 // Action goal处理函数
-rclcpp_action::GoalResponse RobotMover::handleGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPositionAction::Goal> goal)
+rclcpp_action::GoalResponse RobotMover::handleGoal([[maybe_unused]] const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPositionAction::Goal> goal)
 {
     RCLCPP_INFO(this->get_logger(), "Received action goal to move to position (x=%.2f, y=%.2f, z=%.2f)", 
                 goal->px, goal->py, goal->pz);
@@ -197,7 +197,7 @@ rclcpp_action::GoalResponse RobotMover::handleGoal(const rclcpp_action::GoalUUID
 }
 
 // Action取消处理函数
-rclcpp_action::CancelResponse RobotMover::handleCancel(const std::shared_ptr<GoalHandleMoveToPositionAction> goal_handle)
+rclcpp_action::CancelResponse RobotMover::handleCancel([[maybe_unused]] const std::shared_ptr<GoalHandleMoveToPositionAction> goal_handle)
 {
     RCLCPP_INFO(this->get_logger(), "Received cancel request");
     return rclcpp_action::CancelResponse::ACCEPT;
@@ -243,7 +243,7 @@ void RobotMover::executeGoal(const std::shared_ptr<GoalHandleMoveToPositionActio
 }
 
 // Action goal handling function for MoveToPoseAction
-rclcpp_action::GoalResponse RobotMover::handlePoseGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPoseAction::Goal> goal)
+rclcpp_action::GoalResponse RobotMover::handlePoseGoal([[maybe_unused]] const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPoseAction::Goal> goal)
 {
     RCLCPP_INFO(this->get_logger(), "Received action goal to move to pose (x=%.8f, y=%.8f, z=%.8f, qx=%.8f, qy=%.8f, qz=%.8f, qw=%.8f)", 
                 goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw);
@@ -251,7 +251,7 @@ rclcpp_action::GoalResponse RobotMover::handlePoseGoal(const rclcpp_action::Goal
 }
 
 // Action cancel handling function for MoveToPoseAction
-rclcpp_action::CancelResponse RobotMover::handlePoseCancel(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle)
+rclcpp_action::CancelResponse RobotMover::handlePoseCancel([[maybe_unused]] const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle)
 {
     RCLCPP_INFO(this->get_logger(), "Received cancel request for move to pose");
     return rclcpp_action::CancelResponse::ACCEPT;
@@ -300,13 +300,13 @@ void RobotMover::moveToJointPosition(const std::vector<double>& joint_angles, do
 // Goal handling function for MoveToJointPosition
 // test: ros2 action send_goal /move_to_joint_position_action ur5_robot_gripper/action/MoveToJointPosition "{joint_positions: [0, -1.57, 1.57, -1.57, -1.57, 0], velocity_scaling: 0.5}"
 
-rclcpp_action::GoalResponse RobotMover::handleJointGoal(const rclcpp_action::GoalUUID& uuid, std::shared_ptr<const MoveToJointPosition::Goal> goal) {
+rclcpp_action::GoalResponse RobotMover::handleJointGoal([[maybe_unused]] const rclcpp_action::GoalUUID& uuid, [[maybe_unused]] std::shared_ptr<const MoveToJointPosition::Goal> goal) {
     RCLCPP_INFO(this->get_logger(), "Received action goal to move to joint positions");
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
 // Cancel handling function for MoveToJointPosition
-rclcpp_action::CancelResponse RobotMover::handleJointCancel(const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle) {
+rclcpp_action::CancelResponse RobotMover::handleJointCancel([[maybe_unused]] const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle) {
     RCLCPP_INFO(this->get_logger(), "Received cancel request for move to joint positions");
     return rclcpp_action::CancelResponse::ACCEPT;
 }

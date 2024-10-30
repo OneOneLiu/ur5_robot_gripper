@@ -14,13 +14,13 @@ GripperControl::GripperControl(const rclcpp::NodeOptions &options)
     );
 }
 
-rclcpp_action::GoalResponse GripperControl::handleGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveGripperAction::Goal> goal)
+rclcpp_action::GoalResponse GripperControl::handleGoal( [[maybe_unused]] const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveGripperAction::Goal> goal)
 {
     RCLCPP_INFO(this->get_logger(), "Received action goal to move gripper to %.2f", goal->target_position);
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
-rclcpp_action::CancelResponse GripperControl::handleCancel(const std::shared_ptr<GoalHandleMoveGripperAction> goal_handle)
+rclcpp_action::CancelResponse GripperControl::handleCancel([[maybe_unused]] const std::shared_ptr<GoalHandleMoveGripperAction> goal_handle)
 {
     RCLCPP_INFO(this->get_logger(), "Received cancel request for gripper movement");
     return rclcpp_action::CancelResponse::ACCEPT;
