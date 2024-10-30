@@ -41,8 +41,12 @@ ament_target_dependencies(
   robot_control
   "rclcpp"
   "moveit_ros_planning_interface"
+  "rosidl_typesupport_cpp"
 )
-rosidl_target_interfaces(robot_control ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+# Obtain the typesupport target
+target_link_libraries(robot_control ${PROJECT_NAME}__rosidl_typesupport_cpp)
+
 # Build a robot_control service c++ executable
 add_executable(robot_control_node src/robot_control_node.cpp)
 target_include_directories(robot_control_node PUBLIC
@@ -57,7 +61,9 @@ ament_target_dependencies(
   "rclcpp_action"
 )
 target_link_libraries(robot_control_node robot_control)
-rosidl_target_interfaces(robot_control_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+target_link_libraries(robot_control_node ${PROJECT_NAME}__rosidl_typesupport_cpp)
+
 # Install the library and executable
 install(TARGETS robot_control_node
   DESTINATION lib/${PROJECT_NAME})
@@ -75,7 +81,10 @@ ament_target_dependencies(
   "geometry_msgs"
 )
 target_link_libraries(robot_function_test robot_control)
-rosidl_target_interfaces(robot_function_test ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+# Obtain the typesupport target
+target_link_libraries(robot_function_test ${PROJECT_NAME}__rosidl_typesupport_cpp)
+
 # Install the library and executable
 install(TARGETS robot_function_test
   DESTINATION lib/${PROJECT_NAME})
@@ -94,7 +103,7 @@ ament_target_dependencies(
   "moveit_ros_planning_interface"
 )
 
-rosidl_target_interfaces(gripper_control ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(gripper_control ${PROJECT_NAME}__rosidl_typesupport_cpp)
 
 # Build a gripper_control service c++ executable
 add_executable(gripper_control_node src/gripper_control_node.cpp)
@@ -110,7 +119,8 @@ ament_target_dependencies(
   "rclcpp_action"
 )
 target_link_libraries(gripper_control_node gripper_control)
-rosidl_target_interfaces(gripper_control_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(gripper_control_node ${PROJECT_NAME}__rosidl_typesupport_cpp)
+
 # Install the library and executable
 install(TARGETS gripper_control_node
   DESTINATION lib/${PROJECT_NAME})
