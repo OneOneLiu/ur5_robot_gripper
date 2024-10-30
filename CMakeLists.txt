@@ -42,7 +42,7 @@ ament_target_dependencies(
   "rclcpp"
   "moveit_ros_planning_interface"
 )
-
+rosidl_target_interfaces(robot_control ${PROJECT_NAME} "rosidl_typesupport_cpp")
 # Build a robot_control service c++ executable
 add_executable(robot_control_node src/robot_control_node.cpp)
 target_include_directories(robot_control_node PUBLIC
@@ -93,6 +93,8 @@ ament_target_dependencies(
   "rclcpp"
   "moveit_ros_planning_interface"
 )
+
+rosidl_target_interfaces(gripper_control ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 # Build a gripper_control service c++ executable
 add_executable(gripper_control_node src/gripper_control_node.cpp)
