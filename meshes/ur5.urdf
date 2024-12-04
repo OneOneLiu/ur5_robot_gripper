@@ -497,7 +497,7 @@
     <child link="wrist_2_link"/>
     <origin rpy="1.570796327 0 0" xyz="0 -0.09465 -1.941303950897609e-11"/>
     <axis xyz="0 0 1"/>
-    <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
+    <limit effort="28.0" lower="-3.1415926535897931" upper="0.31415926535897931" velocity="3.141592653589793"/>
     <safety_controller k_position="20" k_velocity="0.0" soft_lower_limit="-6.133185307179586" soft_upper_limit="6.133185307179586"/>
     <dynamics damping="0" friction="0"/>
   </joint>
