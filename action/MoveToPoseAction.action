@@ -9,6 +9,7 @@ float64 qy
 float64 qz
 float64 qw
 float64 velocity_scaling
+float64[] cost_metric_curobo
 ---
 # Result
 bool success
