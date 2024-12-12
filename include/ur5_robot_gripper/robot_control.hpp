@@ -14,6 +14,10 @@
 #include <iostream>
 #include <vector>
 
+// For debugging
+#include <nlohmann/json.hpp> 
+#include <fstream>
+
 // Type definitions for MoveToPositionAction
 using MoveToPositionAction = ur5_robot_gripper::action::MoveToPositionAction;
 using GoalHandleMoveToPositionAction = rclcpp_action::ServerGoalHandle<MoveToPositionAction>;
@@ -43,6 +47,9 @@ public:
 
     // Method to print the current pose of the robot
     void printCurrentPose();
+    
+    // For debugging
+    void savePlanToJson(const moveit::planning_interface::MoveGroupInterface::Plan &plan, const std::string &file_name);
 
 private:
     // Helper method to execute a motion plan

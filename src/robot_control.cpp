@@ -48,6 +48,34 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
     });
 }
 
+// For debugging
+void RobotMover::savePlanToJson(const moveit::planning_interface::MoveGroupInterface::Plan &plan, const std::string &file_name)
+{
+    nlohmann::json json_plan;
+
+    for (const auto &point : plan.trajectory_.joint_trajectory.points)
+    {
+        nlohmann::json json_point;
+        json_point["time_from_start"] = point.time_from_start.sec + point.time_from_start.nanosec * 1e-9;
+        json_point["positions"] = point.positions;
+        json_point["velocities"] = point.velocities;
+        json_point["accelerations"] = point.accelerations;
+        json_plan.push_back(json_point);
+    }
+
+    std::ofstream file(file_name);
+    if (!file.is_open())
+    {
+        RCLCPP_ERROR(rclcpp::get_logger("robot_control"), "Failed to open file: %s", file_name.c_str());
+        return;
+    }
+
+    file << json_plan.dump(4); // Save JSON with indentation
+    file.close();
+
+    RCLCPP_INFO(rclcpp::get_logger("robot_control"), "Motion plan saved to %s", file_name.c_str());
+}
+
 // Function to print the current end-effector pose and joint angles
 void RobotMover::printCurrentPose() {
     auto current_pose = move_group_interface_.getCurrentPose().pose; // Get the current pose
@@ -131,6 +159,9 @@ bool RobotMover::executePlan(double velocity_scaling)
     auto const ok = static_cast<bool>(move_group_interface_.plan(msg));
     return std::make_pair(ok, msg);
   }();
+
+  // 将规划保存到 JSON 文件 For debugging
+  savePlanToJson(plan, "motion_plan.json");
 
   // 检查规划是否成功
   if (!success) {
