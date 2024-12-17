@@ -8,6 +8,7 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "ur5_robot_gripper/srv/print_pose.hpp"  // Custom service for printing the pose
 #include "ur5_robot_gripper/srv/move_to_position.hpp"  // Custom service for moving to a position
+#include "ur5_robot_gripper/srv/move_to_pose.hpp"  // Custom service for moving to a position
 #include "ur5_robot_gripper/action/move_to_position_action.hpp"  // MoveToPosition action definition
 #include "ur5_robot_gripper/action/move_to_pose_action.hpp"  // MoveToPose action definition
 #include "ur5_robot_gripper/action/move_to_joint_position.hpp"  // MoveToJointPosition action definition
@@ -60,6 +61,8 @@ private:
                           std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Response> response);
     void handleMovePositionRequest(const std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Request> request,
                                 std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Response> response);
+    void handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::srv::MoveToPose::Request> request,
+                                std::shared_ptr<ur5_robot_gripper::srv::MoveToPose::Response> response);
 
     // Action for MoveToPosition
     rclcpp_action::Server<MoveToPositionAction>::SharedPtr action_server_;
@@ -89,7 +92,8 @@ private:
     rclcpp::Node::SharedPtr node_; // Additional ROS node pointer
     moveit::planning_interface::MoveGroupInterface move_group_interface_;  // MoveIt interface for controlling the arm
     rclcpp::Service<ur5_robot_gripper::srv::PrintPose>::SharedPtr print_current_pose_service_;  // Service pointer for pose requests
-    rclcpp::Service<ur5_robot_gripper::srv::MoveToPosition>::SharedPtr move_to_position_service_;  // Service pointer for position move requests
+    rclcpp::Service<ur5_robot_gripper::srv::MoveToPosition>::SharedPtr move_to_position_service_;  //Service pointer for position move requests
+    rclcpp::Service<ur5_robot_gripper::srv::MoveToPose>::SharedPtr move_to_pose_service_;  // 
     std::shared_ptr<rclcpp::executors::SingleThreadedExecutor> executor_;  // Single-threaded executor
     std::thread executor_thread_;  // Thread to run the executor
 };

@@ -14,6 +14,8 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
     );
     move_to_position_service_ = this->create_service<ur5_robot_gripper::srv::MoveToPosition>(
             "move_to_position", std::bind(&RobotMover::handleMovePositionRequest, this, std::placeholders::_1, std::placeholders::_2));
+    move_to_pose_service_ = this->create_service<ur5_robot_gripper::srv::MoveToPose>(
+            "move_to_pose", std::bind(&RobotMover::handleMovePoseRequest, this, std::placeholders::_1, std::placeholders::_2));
     
     // 创建 Action Server
     this->action_server_ = rclcpp_action::create_server<MoveToPositionAction>(
@@ -216,6 +218,16 @@ void RobotMover::handleMovePositionRequest(const std::shared_ptr<ur5_robot_gripp
         RCLCPP_INFO(this->get_logger(), "Get Pose in call.");
         printCurrentPose();  // 获取当前姿态
         moveToPosition(request->px, request->py, request->pz);
+        response->success = true;
+    }
+
+void RobotMover::handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::srv::MoveToPose::Request> request,
+                                std::shared_ptr<ur5_robot_gripper::srv::MoveToPose::Response> response)
+    {
+        // 延迟确保状态信息已经更新
+        RCLCPP_INFO(this->get_logger(), "Get Pose in call.");
+        printCurrentPose();  // 获取当前姿态
+        moveToPose(request->px, request->py, request->pz, request->qx, request->qy, request->qz, request->qw, request->velocity_scaling);
         response->success = true;
     }
 
