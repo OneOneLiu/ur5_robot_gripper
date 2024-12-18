@@ -2,6 +2,7 @@
 #define ROBOT_CONTROL_HPP
 
 #include <memory>
+#include <optional>  // 引入 std::optional
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <geometry_msgs/msg/pose.hpp>
@@ -54,7 +55,9 @@ public:
 
 private:
     // Helper method to execute a motion plan
-    bool executePlan(double velocity_scaling);
+    bool executePlan(const moveit::planning_interface::MoveGroupInterface::Plan &plan);
+    std::optional<moveit::planning_interface::MoveGroupInterface::Plan> genPlan(double velocity_scaling);
+    moveit::planning_interface::MoveGroupInterface::Plan current_plan_;
 
     // Service callback functions
     void getRobotStateRequest(const std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Request> /*request*/,

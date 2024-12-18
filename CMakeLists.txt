@@ -30,7 +30,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/MoveGripperAction.action"
   "action/ExecuteGrasp.action"
   "action/MoveToJointPosition.action"
-  DEPENDENCIES builtin_interfaces geometry_msgs action_msgs
+  DEPENDENCIES builtin_interfaces geometry_msgs action_msgs trajectory_msgs
 )
 
 # Build a robot_control c++ library

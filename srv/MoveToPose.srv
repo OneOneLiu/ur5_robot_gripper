@@ -8,4 +8,6 @@ float64 qz
 float64 qw
 float64 velocity_scaling
 ---
-bool success
+bool success               # 是否成功生成规划
+string message             # 状态信息
+trajectory_msgs/JointTrajectory trajectory  # 关节轨迹数据
