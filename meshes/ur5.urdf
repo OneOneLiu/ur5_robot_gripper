@@ -540,7 +540,7 @@
   <link name="finger_center"/>
   <joint name="tool0-finger_center" type="fixed">
     <!-- default toolframe - X+ left, Y+ up, Z+ front -->
-    <origin rpy="0 0 0" xyz="0 0 0.15"/>
+    <origin rpy="0 0 0" xyz="0 0 0.16"/>
     <parent link="tool0"/>
     <child link="finger_center"/>
   </joint>
