@@ -25,6 +25,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/MoveToPose.srv"
   "srv/MoveToPosition.srv"
   "srv/PrintPose.srv"
+  "srv/SetConstraints.srv"
   "action/MoveToPositionAction.action"
   "action/MoveToPoseAction.action"
   "action/MoveGripperAction.action"

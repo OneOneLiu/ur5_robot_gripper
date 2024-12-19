@@ -9,6 +9,7 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "ur5_robot_gripper/srv/print_pose.hpp"  // Custom service for printing the pose
 #include "ur5_robot_gripper/srv/move_to_position.hpp"  // Custom service for moving to a position
+#include "ur5_robot_gripper/srv/set_constraints.hpp"  // Custom service for printing the pose
 #include "ur5_robot_gripper/srv/move_to_pose.hpp"  // Custom service for moving to a position
 #include "ur5_robot_gripper/action/move_to_position_action.hpp"  // MoveToPosition action definition
 #include "ur5_robot_gripper/action/move_to_pose_action.hpp"  // MoveToPose action definition
@@ -50,6 +51,9 @@ public:
     // Method to print the current pose of the robot
     void printCurrentPose();
     
+    // Method to setup constraints during planning
+    void setConstraints(double box_dx, double box_dy, double box_dz);
+
     // For debugging
     void savePlanToJson(const moveit::planning_interface::MoveGroupInterface::Plan &plan, const std::string &file_name);
 
@@ -66,7 +70,11 @@ private:
                                 std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Response> response);
     void handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::srv::MoveToPose::Request> request,
                                 std::shared_ptr<ur5_robot_gripper::srv::MoveToPose::Response> response);
-
+    bool handleSetConstraintsRequest(
+                            const std::shared_ptr<ur5_robot_gripper::srv::SetConstraints::Request> request,
+                            std::shared_ptr<ur5_robot_gripper::srv::SetConstraints::Response> response);
+    // Service for setup motion planning constraints
+    rclcpp::Service<ur5_robot_gripper::srv::SetConstraints>::SharedPtr set_constraint_service_;
     // Action for MoveToPosition
     rclcpp_action::Server<MoveToPositionAction>::SharedPtr action_server_;
 

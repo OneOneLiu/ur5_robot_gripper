@@ -17,6 +17,10 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
     move_to_pose_service_ = this->create_service<ur5_robot_gripper::srv::MoveToPose>(
             "move_to_pose", std::bind(&RobotMover::handleMovePoseRequest, this, std::placeholders::_1, std::placeholders::_2));
     
+    set_constraint_service_ = this->create_service<ur5_robot_gripper::srv::SetConstraints>(
+    "set_constraint", std::bind(&RobotMover::handleSetConstraintsRequest, this, std::placeholders::_1, std::placeholders::_2));
+
+
     // 创建 Action Server
     this->action_server_ = rclcpp_action::create_server<MoveToPositionAction>(
       this,
@@ -399,4 +403,64 @@ void RobotMover::executeJointGoal(const std::shared_ptr<GoalHandleMoveToJointPos
     result->success = true;
     goal_handle->succeed(result);
     RCLCPP_INFO(this->get_logger(), "Move to joint positions action goal completed successfully");
+}
+
+// Constrained planning
+
+void RobotMover::setConstraints(double box_dx, double box_dy, double box_dz) {
+    // Get the current pose
+    auto current_pose = move_group_interface_.getCurrentPose().pose;
+
+    // Define the box constraint
+    moveit_msgs::msg::PositionConstraint box_constraint;
+    box_constraint.header.frame_id = move_group_interface_.getPoseReferenceFrame();
+    box_constraint.link_name = move_group_interface_.getEndEffectorLink();
+
+    shape_msgs::msg::SolidPrimitive box;
+    box.type = shape_msgs::msg::SolidPrimitive::BOX;
+    box.dimensions = {box_dx, box_dy, box_dz}; // Box dimensions: width, height, depth
+    box_constraint.constraint_region.primitives.emplace_back(box);
+
+    // Set the pose of the box constraint, use current end pose
+    geometry_msgs::msg::Pose box_pose;
+    box_pose.position.x = current_pose.position.x;
+    box_pose.position.y = current_pose.position.y;
+    box_pose.position.z = current_pose.position.z;
+    box_pose.orientation.w = current_pose.orientation.w;
+    box_pose.orientation.x = current_pose.orientation.x;
+    box_pose.orientation.y = current_pose.orientation.y;
+    box_pose.orientation.z = current_pose.orientation.z;
+    box_constraint.constraint_region.primitive_poses.emplace_back(box_pose);
+    box_constraint.weight = 1.0;
+
+    // Create the constraints message
+    moveit_msgs::msg::Constraints constraints;
+    constraints.position_constraints.emplace_back(box_constraint);
+
+    // Apply the constraints to the MoveGroupInterface
+    move_group_interface_.setPathConstraints(constraints);
+    // It’s helpful to increase the default planning time, as planning with constraints can be slower.
+    move_group_interface.setPlanningTime(10.0);
+}
+
+bool RobotMover::handleSetConstraintsRequest(
+    const std::shared_ptr<ur5_robot_gripper::srv::SetConstraints::Request> request,
+    std::shared_ptr<ur5_robot_gripper::srv::SetConstraints::Response> response) 
+{
+    if (request->box_width == 0.0 && request->box_height == 0.0 && request->box_depth == 0.0)
+    {
+        move_group_interface_.clearPathConstraints();
+        RCLCPP_INFO(this->get_logger(), "Cleared Constraints");
+        response->message = "Constraints cleared successfully.";
+        return false;
+    }
+    
+    setConstraints(request->box_width, request->box_height, request->box_depth);
+    // Set the response message
+    response->success = true;
+    response->message = "Constraints set successfully.";
+    RCLCPP_INFO(this->get_logger(), "Constraints set: Box [%f, %f, %f] at current robot end position",
+                request->box_width, request->box_height, request->box_depth);
+    
+    return true;
 }
