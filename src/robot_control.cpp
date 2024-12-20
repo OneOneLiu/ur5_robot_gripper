@@ -434,7 +434,7 @@ void RobotMover::executeJointGoal(const std::shared_ptr<GoalHandleMoveToJointPos
 
 // Constrained planning
 
-void RobotMover::setConstraints(double box_dx, double box_dy, double box_dz, bool use_end_pose, double box_px, double box_py, double box_pz) {
+void RobotMover::setConstraints(bool use_pos_cons,double box_dx, double box_dy, double box_dz, bool use_end_position, double box_px, double box_py, double box_pz, bool use_ori_cons, bool keep_end_orientation, double qx, double qy, double qz, double qw) {
     // Get the current pose
     auto current_pose = move_group_interface_.getCurrentPose().pose;
 
@@ -451,7 +451,7 @@ void RobotMover::setConstraints(double box_dx, double box_dy, double box_dz, boo
     // Set the pose of the box constraint, use current end pose
     geometry_msgs::msg::Pose box_pose;
     // Use the current end effector pose, if not, use the world pose
-    if (use_end_pose) {
+    if (use_end_position) {
             box_pose.position.x = current_pose.position.x;
             box_pose.position.y = current_pose.position.y;
             box_pose.position.z = current_pose.position.z;
@@ -470,9 +470,34 @@ void RobotMover::setConstraints(double box_dx, double box_dy, double box_dz, boo
     box_constraint.constraint_region.primitive_poses.emplace_back(box_pose);
     box_constraint.weight = 1.0;
 
+    // Create orientation constraint
+    moveit_msgs::msg::OrientationConstraint orientation_constraint;
+    orientation_constraint.header.frame_id = move_group_interface_.getPoseReferenceFrame();
+    orientation_constraint.link_name = move_group_interface_.getEndEffectorLink();
+
+    if (keep_end_orientation) {
+        orientation_constraint.orientation = current_pose.orientation;
+    }
+    else {
+        orientation_constraint.orientation.w = qw;
+        orientation_constraint.orientation.x = qx;
+        orientation_constraint.orientation.y = qy;
+        orientation_constraint.orientation.z = qz;
+    }
+
+    orientation_constraint.absolute_x_axis_tolerance = 0.1;
+    orientation_constraint.absolute_y_axis_tolerance = 0.1;
+    orientation_constraint.absolute_z_axis_tolerance = 0.1;
+    orientation_constraint.weight = 1.0;
+
     // Create the constraints message
     moveit_msgs::msg::Constraints constraints;
-    constraints.position_constraints.emplace_back(box_constraint);
+    if (use_pos_cons) {
+        constraints.position_constraints.emplace_back(box_constraint);
+    }
+    if (use_ori_cons) {
+        constraints.orientation_constraints.emplace_back(orientation_constraint);
+    }
 
     // Apply the constraints to the MoveGroupInterface
     move_group_interface_.setPathConstraints(constraints);
@@ -487,7 +512,7 @@ bool RobotMover::handleSetConstraintsRequest(
     const std::shared_ptr<ur5_robot_gripper::srv::SetConstraints::Request> request,
     std::shared_ptr<ur5_robot_gripper::srv::SetConstraints::Response> response) 
 {
-    if (request->box_dx == 0.0 && request->box_dy == 0.0 && request->box_dz == 0.0)
+    if (!request->use_pos_cons && !request->use_ori_cons)
     {
         move_group_interface_.clearPathConstraints();
         RCLCPP_INFO(this->get_logger(), "Cleared Constraints");
@@ -497,7 +522,7 @@ bool RobotMover::handleSetConstraintsRequest(
         return true;
     }
     
-    setConstraints(request->box_dx, request->box_dy, request->box_dz, request->use_end_pose, request->box_px, request->box_py, request->box_pz);
+    setConstraints(request->use_pos_cons, request->box_dx, request->box_dy, request->box_dz, request->use_end_position, request->box_px, request->box_py, request->box_pz, request->use_ori_cons, request->keep_end_orientation, request->qx, request->qy, request->qz, request->qw);
     // Set the response message
     response->success = true;
     response->message = "Constraints set successfully.";
@@ -506,10 +531,8 @@ bool RobotMover::handleSetConstraintsRequest(
     
     return true;
 
-    // ros2 service call /set_constraints ur5_robot_gripper/srv/SetConstraints '{box_dx: 0.8, box_dy: 0.4, box_dz: 0.6, use_end_pose: false, box_px: 0.0, box_py: -0.54, box_pz: 0.3}' // space of tray, rack and tubes
+    // ros2 service call /set_constraints ur5_robot_gripper/srv/SetConstraints '{box_dx: 0.0, box_dy: 0.0, box_dz: 0.0, use_end_position: false, box_px: 0.0, box_py: -0.54, box_pz: 0.3, use_ori_cons: false, keep_end_orientation: true, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0}'
     // ros2 service call /set_constraints ur5_robot_gripper/srv/SetConstraints '{box_dx: 0.8, box_dy: 0.7, box_dz: 0.6, use_end_pose: false, box_px: 0.0, box_py: -0.4, box_pz: 0.3}' // space of tray, rack and tubes
     // ros2 service call /set_constraints ur5_robot_gripper/srv/SetConstraints '{box_dx: 0.0, box_dy: 0.0, box_dz: 0.0, use_end_pose: true, box_px: 0.1, box_py: 0.2, box_pz: 0.3}'
     // ros2 service call /set_constraints ur5_robot_gripper/srv/SetConstraints '{box_dx: 0.1, box_dy: 0.1, box_dz: 0.1, use_end_pose: true, box_px: 0.1, box_py: 0.2, box_pz: 0.3}'
-
-
 }

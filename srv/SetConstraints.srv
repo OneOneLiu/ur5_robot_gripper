@@ -4,7 +4,14 @@ float64 box_dz
 float64 box_px
 float64 box_py
 float64 box_pz
-bool use_end_pose
+float64 qx
+float64 qy
+float64 qz
+float64 qw
+bool use_end_position
+bool keep_end_orientation
+bool use_ori_cons
+bool use_pos_cons
 ---
 bool success
 string message
