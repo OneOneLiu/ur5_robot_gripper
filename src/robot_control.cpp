@@ -9,7 +9,7 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
     visual_tools_(                         // Initialize MoveItVisualTools for visualization
           node_,              // Node shared pointer
           "base_link",                     // Base frame
-          "/move_group_tutorial",    // Marker topic NOTE: this topic is published by the visual tools and subscribed to by RViz, so it must match the topic name in the RViz configuration
+          "/move_group_tutorial",    // Marker topic NOTE: this topic is published by the visual tools and
           move_group_interface_.getRobotModel() // Robot model
       )
 {
@@ -94,8 +94,14 @@ void RobotMover::visualizeBox(const geometry_msgs::msg::Pose &box_pose, double b
     // Define the box dimensions
     Eigen::Vector3d box_size(box_dx, box_dy, box_dz);
 
+    // Add custom transparency by modifying the alpha channel
+    std_msgs::msg::ColorRGBA color_with_alpha;
+    color_with_alpha.r = 0.5; // Grey (R=G=B)
+    color_with_alpha.g = 0.5;
+    color_with_alpha.b = 0.5;
+    color_with_alpha.a = 0.5; // Semi-transparent (alpha = 0.5)
     // Publish the box marker
-    visual_tools_.publishCuboid(box_pose, box_size.x(), box_size.y(), box_size.z(), rviz_visual_tools::GREEN);
+    visual_tools_.publishCuboid(box_pose, box_size.x(), box_size.y(), box_size.z(), color_with_alpha);
     visual_tools_.trigger(); // Send markers to RViz
 }
 
@@ -189,7 +195,10 @@ RobotMover::genPlan(double velocity_scaling)
 
   // Generate the motion plan
   bool success = static_cast<bool>(move_group_interface_.plan(plan));
-
+  joint_model_group_ = move_group_interface_.getCurrentState()->getJointModelGroup("manipulator");
+  visual_tools_.publishTrajectoryLine(plan.trajectory_, joint_model_group_);
+  visual_tools_.trigger();
+  RCLCPP_INFO(rclcpp::get_logger("robot_control"), "Visualized the plan in Rviz");
   // Save the plan to JSON for debugging
   savePlanToJson(plan, "motion_plan.json");
 
@@ -471,6 +480,7 @@ bool RobotMover::handleSetConstraintsRequest(
     {
         move_group_interface_.clearPathConstraints();
         RCLCPP_INFO(this->get_logger(), "Cleared Constraints");
+        visual_tools_.deleteAllMarkers();
         response->message = "Constraints cleared successfully.";
         response->success = true;
         return true;

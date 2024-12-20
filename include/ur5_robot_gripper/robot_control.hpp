@@ -113,6 +113,8 @@ private:
     std::shared_ptr<rclcpp::executors::SingleThreadedExecutor> executor_;  // Single-threaded executor
     std::thread executor_thread_;  // Thread to run the executor
     moveit_visual_tools::MoveItVisualTools visual_tools_;
+    // Raw pointers are frequently used to refer to the planning group for improved performance.
+    const moveit::core::JointModelGroup* joint_model_group_;
 };
 
 #endif // ROBOT_CONTROL_HPP
