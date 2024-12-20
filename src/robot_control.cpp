@@ -440,7 +440,7 @@ void RobotMover::setConstraints(double box_dx, double box_dy, double box_dz) {
     // Apply the constraints to the MoveGroupInterface
     move_group_interface_.setPathConstraints(constraints);
     // It’s helpful to increase the default planning time, as planning with constraints can be slower.
-    move_group_interface.setPlanningTime(10.0);
+    move_group_interface_.setPlanningTime(10.0);
 }
 
 bool RobotMover::handleSetConstraintsRequest(
