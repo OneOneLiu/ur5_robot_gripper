@@ -54,7 +54,7 @@ public:
     void printCurrentPose();
     
     // Method to setup constraints during planning
-    void setConstraints(double box_dx, double box_dy, double box_dz);
+    void setConstraints(double box_dx, double box_dy, double box_dz, bool use_end_pose, double box_px, double box_py, double box_pz);
 
     // For debugging
     void savePlanToJson(const moveit::planning_interface::MoveGroupInterface::Plan &plan, const std::string &file_name);
