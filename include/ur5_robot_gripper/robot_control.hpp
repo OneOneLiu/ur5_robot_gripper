@@ -5,6 +5,7 @@
 #include <optional>  // 引入 std::optional
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit_visual_tools/moveit_visual_tools.h>
 #include <geometry_msgs/msg/pose.hpp>
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "ur5_robot_gripper/srv/print_pose.hpp"  // Custom service for printing the pose
@@ -14,6 +15,7 @@
 #include "ur5_robot_gripper/action/move_to_position_action.hpp"  // MoveToPosition action definition
 #include "ur5_robot_gripper/action/move_to_pose_action.hpp"  // MoveToPose action definition
 #include "ur5_robot_gripper/action/move_to_joint_position.hpp"  // MoveToJointPosition action definition
+#include <Eigen/Geometry> // For visualizing shapes
 #include <iostream>
 #include <vector>
 
@@ -56,6 +58,9 @@ public:
 
     // For debugging
     void savePlanToJson(const moveit::planning_interface::MoveGroupInterface::Plan &plan, const std::string &file_name);
+    
+    // Method to visualize a box in RViz
+    void visualizeBox(const geometry_msgs::msg::Pose &box_pose, double box_dx, double box_dy, double box_dz);
 
 private:
     // Helper method to execute a motion plan
@@ -107,6 +112,7 @@ private:
     rclcpp::Service<ur5_robot_gripper::srv::MoveToPose>::SharedPtr move_to_pose_service_;  // 
     std::shared_ptr<rclcpp::executors::SingleThreadedExecutor> executor_;  // Single-threaded executor
     std::thread executor_thread_;  // Thread to run the executor
+    moveit_visual_tools::MoveItVisualTools visual_tools_;
 };
 
 #endif // ROBOT_CONTROL_HPP

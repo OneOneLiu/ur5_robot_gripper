@@ -17,6 +17,11 @@
 
   <exec_depend>rclpy</exec_depend>  
   <exec_depend>tf2_ros</exec_depend>
+  <depend>graph_msgs</depend>
+  <build_depend>moveit_visual_tools</build_depend>
+  <build_depend>rviz_visual_tools</build_depend>
+  <exec_depend>moveit_visual_tools</exec_depend>
+  <exec_depend>rviz_visual_tools</exec_depend>
   <member_of_group>rosidl_interface_packages</member_of_group>
 
   <!-- For customized srv -->

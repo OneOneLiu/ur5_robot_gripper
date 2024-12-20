@@ -5,7 +5,13 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
   : rclcpp::Node("robot_control", options), // Initialize the node with the name "robot_control"
     node_(std::make_shared<rclcpp::Node>("move_group_interface")), // Create an additional ROS node
     move_group_interface_(node_, "manipulator"), // Initialize MoveGroupInterface for controlling the arm
-    executor_(std::make_shared<rclcpp::executors::SingleThreadedExecutor>()) // Create a single-threaded executor
+    executor_(std::make_shared<rclcpp::executors::SingleThreadedExecutor>()), // Create a single-threaded executor
+    visual_tools_(                         // Initialize MoveItVisualTools for visualization
+          node_,              // Node shared pointer
+          "base_link",                     // Base frame
+          "/move_group_tutorial",    // Marker topic NOTE: this topic is published by the visual tools and subscribed to by RViz, so it must match the topic name in the RViz configuration
+          move_group_interface_.getRobotModel() // Robot model
+      )
 {
     // Create the service for printing the current pose
     print_current_pose_service_ = this->create_service<ur5_robot_gripper::srv::PrintPose>(
@@ -80,6 +86,17 @@ void RobotMover::savePlanToJson(const moveit::planning_interface::MoveGroupInter
     file.close();
 
     RCLCPP_INFO(rclcpp::get_logger("robot_control"), "Motion plan saved to %s", file_name.c_str());
+}
+
+// Function to visualize the box constraint
+void RobotMover::visualizeBox(const geometry_msgs::msg::Pose &box_pose, double box_dx, double box_dy, double box_dz)
+{
+    // Define the box dimensions
+    Eigen::Vector3d box_size(box_dx, box_dy, box_dz);
+
+    // Publish the box marker
+    visual_tools_.publishCuboid(box_pose, box_size.x(), box_size.y(), box_size.z(), rviz_visual_tools::GREEN);
+    visual_tools_.trigger(); // Send markers to RViz
 }
 
 // Function to print the current end-effector pose and joint angles
@@ -441,6 +458,9 @@ void RobotMover::setConstraints(double box_dx, double box_dy, double box_dz) {
     move_group_interface_.setPathConstraints(constraints);
     // It’s helpful to increase the default planning time, as planning with constraints can be slower.
     move_group_interface_.setPlanningTime(10.0);
+
+    // Visualize the box constraint in RViz
+    visualizeBox(box_pose, box_dx, box_dy, box_dz);
 }
 
 bool RobotMover::handleSetConstraintsRequest(
@@ -452,7 +472,8 @@ bool RobotMover::handleSetConstraintsRequest(
         move_group_interface_.clearPathConstraints();
         RCLCPP_INFO(this->get_logger(), "Cleared Constraints");
         response->message = "Constraints cleared successfully.";
-        return false;
+        response->success = true;
+        return true;
     }
     
     setConstraints(request->box_width, request->box_height, request->box_depth);

@@ -19,6 +19,18 @@ find_package(action_msgs REQUIRED)
 # For debugging
 find_package(nlohmann_json REQUIRED)
 
+set(THIS_PACKAGE_INCLUDE_DEPENDS
+ament_cmake
+Boost
+Eigen3
+moveit_visual_tools
+rviz_visual_tools
+)
+
+foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
+find_package(${Dependency} REQUIRED)
+endforeach()
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StringArray.msg"
   "srv/PoseTransform.srv"
@@ -45,6 +57,8 @@ ament_target_dependencies(
   "rclcpp"
   "moveit_ros_planning_interface"
   "rosidl_typesupport_cpp"
+  ${THIS_PACKAGE_INCLUDE_DEPENDS}
+  Boost
 )
 
 # Obtain the typesupport target
@@ -63,6 +77,7 @@ ament_target_dependencies(
   "geometry_msgs"
   "rclcpp_action"
 )
+
 target_link_libraries(robot_control_node robot_control)
 
 target_link_libraries(robot_control_node ${PROJECT_NAME}__rosidl_typesupport_cpp)
