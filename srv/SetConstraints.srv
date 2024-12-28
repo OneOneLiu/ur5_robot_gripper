@@ -8,6 +8,7 @@ float64 qx
 float64 qy
 float64 qz
 float64 qw
+float64 angle_tolerance
 bool use_end_position
 bool keep_end_orientation
 bool use_ori_cons
