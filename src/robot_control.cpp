@@ -235,8 +235,8 @@ void RobotMover::getRobotStateRequest(const std::shared_ptr<ur5_robot_gripper::s
     auto current_joint_values = move_group_interface_.getCurrentJointValues(); 
 
     // Print both pose and joint angles
-    RCLCPP_INFO(node_->get_logger(), "Service Callback: Current Pose and Joint Angles:");
-    printCurrentPose(); // Print pose and joint angles
+    // RCLCPP_INFO(node_->get_logger(), "Service Callback: Current Pose and Joint Angles:");
+    // printCurrentPose(); // Print pose and joint angles
 
     // Set the pose in the response
     response->pose.position.x = current_pose.position.x;
@@ -270,15 +270,60 @@ void RobotMover::handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::
         // 延迟确保状态信息已经更新
         RCLCPP_INFO(this->get_logger(), "Get Pose in call.");
         printCurrentPose();  // 获取当前姿态
-        bool success = moveToPose(request->px, request->py, request->pz, request->qx, request->qy, request->qz, request->qw, request->velocity_scaling);
+        bool reachable = isPoseReachableWithCollisionCheck(request->px, request->py, request->pz, request->qx, request->qy, request->qz, request->qw);
 
-        if (!success) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to execute motion plan.");
+        if (!reachable)
+        {
+            RCLCPP_ERROR(this->get_logger(), "The target pose is not reachable or is in collision.");
             response->success = false;
-            response->message = "Failed to generate motion plan.";
+            response->message = "Target pose is not reachable or in collision.";
             return;
         }
 
+        bool success = moveToPose(request->px, request->py, request->pz, request->qx, request->qy, request->qz, request->qw, request->velocity_scaling);
+        
+        // 保存默认规划器
+        std::string default_planner = move_group_interface_.getPlannerId();
+
+        // 定义规划器列表
+        std::vector<std::string> planners = {
+            "SBL", "LBKPIECE", "BKPIECE", "KPIECE", "RRT",
+            "RRTConnect", "RRTstar", "TRRT", "PRM", "PRMstar"
+        };
+        if(!success){
+            RCLCPP_WARN(this->get_logger(), "Motion plan failed using default planner, trying other planners.");
+
+            // 遍历规划器列表
+            for (const auto &planner : planners)
+            {
+                // 设置当前规划器
+                move_group_interface_.setPlannerId(planner);
+                RCLCPP_INFO(this->get_logger(), "Trying planner: %s", planner.c_str());
+
+                // 尝试两次
+                for (int attempt = 1; attempt <= 2; ++attempt)
+                {
+                    RCLCPP_INFO(this->get_logger(), "Attempt %d with planner %s", attempt, planner.c_str());
+                    success = moveToPose(request->px, request->py, request->pz, request->qx, request->qy, request->qz, request->qw, request->velocity_scaling);
+                    if (success)
+                    {
+                        RCLCPP_INFO(this->get_logger(), "Motion plan succeeded using planner %s on attempt %d.", planner.c_str(), attempt);
+                        response->success = true;
+                        response->message = "Motion plan generated successfully.";
+                        response->trajectory = current_plan_.trajectory_.joint_trajectory;
+                        // 恢复默认规划器
+                        move_group_interface_.setPlannerId(default_planner);
+                        return;
+                    }
+                    else
+                    {
+                        RCLCPP_WARN(this->get_logger(), "Motion plan failed using planner %s on attempt %d.", planner.c_str(), attempt);
+                    }
+                }
+            }
+            // 恢复默认规划器
+            move_group_interface_.setPlannerId(default_planner);
+        }
         else {
             response->success = true;
             response->message = "Motion plan generated successfully.";
@@ -502,7 +547,7 @@ void RobotMover::setConstraints(bool use_pos_cons,double box_dx, double box_dy, 
     // Apply the constraints to the MoveGroupInterface
     move_group_interface_.setPathConstraints(constraints);
     // It’s helpful to increase the default planning time, as planning with constraints can be slower.
-    move_group_interface_.setPlanningTime(10.0);
+    move_group_interface_.setPlanningTime(60.0);
 
     // Visualize the box constraint in RViz
     visualizeBox(box_pose, box_dx, box_dy, box_dz);
@@ -529,5 +574,60 @@ bool RobotMover::handleSetConstraintsRequest(
     RCLCPP_INFO(this->get_logger(), "Constraints set: Box [%f, %f, %f] at current robot end position",
                 request->box_dx, request->box_dy, request->box_dz);
     
+    return true;
+}
+
+bool RobotMover::isPoseReachableWithCollisionCheck(double px, double py, double pz, double qx, double qy, double qz, double qw)
+{
+    geometry_msgs::msg::Pose target_pose;
+    target_pose.position.x = px;
+    target_pose.position.y = py;
+    target_pose.position.z = pz;
+    target_pose.orientation.x = qx;
+    target_pose.orientation.y = qy;
+    target_pose.orientation.z = qz;
+    target_pose.orientation.w = qw;
+
+    // 使用当前节点的共享指针初始化 RobotModelLoader
+    robot_model_loader::RobotModelLoader robot_model_loader(node_, "robot_description");
+
+    // 加载机器人模型
+    moveit::core::RobotModelPtr kinematic_model = robot_model_loader.getModel();
+    if (!kinematic_model)
+    {
+        RCLCPP_ERROR(this->get_logger(), "Failed to load robot model!");
+        return false;
+    }
+
+    // 创建 RobotState 和 PlanningScene
+    moveit::core::RobotState kinematic_state(kinematic_model);
+    kinematic_state.setToDefaultValues();
+    planning_scene::PlanningScene planning_scene(kinematic_model);
+
+    // 获取关节组
+    const moveit::core::JointModelGroup *joint_model_group = kinematic_model->getJointModelGroup("manipulator");
+    if (!joint_model_group)
+    {
+        RCLCPP_ERROR(this->get_logger(), "Failed to get joint model group for manipulator!");
+        return false;
+    }
+
+    // 尝试为目标位姿计算 IK 解
+    bool found_ik = kinematic_state.setFromIK(joint_model_group, target_pose);
+    if (!found_ik)
+    {
+        RCLCPP_WARN(this->get_logger(), "The target pose is not reachable (IK solution not found).");
+        return false;
+    }
+
+    // 检查碰撞
+    bool in_collision = planning_scene.isStateColliding(kinematic_state, "manipulator", true);
+    if (in_collision)
+    {
+        RCLCPP_WARN(this->get_logger(), "The target pose is reachable but in collision.");
+        return false;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "The target pose is reachable and collision-free.");
     return true;
 }
