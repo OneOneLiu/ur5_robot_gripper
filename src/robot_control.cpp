@@ -416,6 +416,8 @@ void RobotMover::executePoseGoal(const std::shared_ptr<GoalHandleMoveToPoseActio
     auto feedback = std::make_shared<MoveToPoseAction::Feedback>();
     auto result = std::make_shared<MoveToPoseAction::Result>();
 
+    bool reachable = isPoseReachableWithCollisionCheck(goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw);
+    
     // 调用 moveToPose
     // moveToPose 执行完毕后，检查规划和执行结果
     if (moveToPose(goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw, goal->velocity_scaling)) {
@@ -621,6 +623,24 @@ bool RobotMover::isPoseReachableWithCollisionCheck(double px, double py, double 
     }
 
     // 检查碰撞
+    collision_detection::CollisionRequest collision_request;
+    collision_detection::CollisionResult collision_result;
+    planning_scene.checkCollision(collision_request, collision_result, kinematic_state);
+
+    std::string collision_object = "";
+    // 判断是否发生碰撞
+    if (collision_result.collision)
+    {
+        RCLCPP_WARN(this->get_logger(), "Collision detected!");
+
+        // 获取碰撞对象
+        for (const auto& contact : collision_result.contacts)
+        {
+            collision_object = contact.first.first; // 碰撞的第一个对象
+            RCLCPP_WARN(this->get_logger(), "Collision with: %s", collision_object.c_str());
+        }
+    }
+
     bool in_collision = planning_scene.isStateColliding(kinematic_state, "manipulator", true);
     if (in_collision)
     {
