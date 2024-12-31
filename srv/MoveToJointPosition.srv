@@ -1,0 +1,9 @@
+# The goal consists of the target joint angles and velocity scaling
+float64[] joint_positions  # List of joint angles
+float64 velocity_scaling   # Scaling factor for velocity (0.0 to 1.0)
+
+---
+# Result will indicate whether the action succeeded
+bool success
+string message             # 状态信息
+trajectory_msgs/JointTrajectory trajectory  # 关节轨迹数据

@@ -16,6 +16,7 @@
 #include "ur5_robot_gripper/srv/move_to_position.hpp"  // Custom service for moving to a position
 #include "ur5_robot_gripper/srv/set_constraints.hpp"  // Custom service for printing the pose
 #include "ur5_robot_gripper/srv/move_to_pose.hpp"  // Custom service for moving to a position
+#include "ur5_robot_gripper/srv/move_to_joint_position.hpp"  // Custom service for moving to a jointposition
 #include "ur5_robot_gripper/action/move_to_position_action.hpp"  // MoveToPosition action definition
 #include "ur5_robot_gripper/action/move_to_pose_action.hpp"  // MoveToPose action definition
 #include "ur5_robot_gripper/action/move_to_joint_position.hpp"  // MoveToJointPosition action definition
@@ -53,7 +54,7 @@ public:
     void moveToPosition(double px, double py, double pz, double velocity_scaling);
 
     // Method to move to a specified joint position
-    void moveToJointPosition(const std::vector<double>& joint_angles, double velocity_scaling);
+    bool moveToJointPosition(const std::vector<double>& joint_angles, double velocity_scaling);
 
     // Method to print the current pose of the robot
     void printCurrentPose();
@@ -82,6 +83,8 @@ private:
                                 std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Response> response);
     void handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::srv::MoveToPose::Request> request,
                                 std::shared_ptr<ur5_robot_gripper::srv::MoveToPose::Response> response);
+    void handleMoveJointPositionRequest(const std::shared_ptr<ur5_robot_gripper::srv::MoveToJointPosition::Request> request,
+                                std::shared_ptr<ur5_robot_gripper::srv::MoveToJointPosition::Response> response);
     bool handleSetConstraintsRequest(
                             const std::shared_ptr<ur5_robot_gripper::srv::SetConstraints::Request> request,
                             std::shared_ptr<ur5_robot_gripper::srv::SetConstraints::Response> response);
@@ -117,6 +120,7 @@ private:
     rclcpp::Service<ur5_robot_gripper::srv::PrintPose>::SharedPtr print_current_pose_service_;  // Service pointer for pose requests
     rclcpp::Service<ur5_robot_gripper::srv::MoveToPosition>::SharedPtr move_to_position_service_;  //Service pointer for position move requests
     rclcpp::Service<ur5_robot_gripper::srv::MoveToPose>::SharedPtr move_to_pose_service_;  // 
+    rclcpp::Service<ur5_robot_gripper::srv::MoveToJointPosition>::SharedPtr move_to_joint_position_service_;  // 
     std::shared_ptr<rclcpp::executors::SingleThreadedExecutor> executor_;  // Single-threaded executor
     std::thread executor_thread_;  // Thread to run the executor
     moveit_visual_tools::MoveItVisualTools visual_tools_;

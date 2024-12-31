@@ -22,6 +22,8 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
             "move_to_position", std::bind(&RobotMover::handleMovePositionRequest, this, std::placeholders::_1, std::placeholders::_2));
     move_to_pose_service_ = this->create_service<ur5_robot_gripper::srv::MoveToPose>(
             "move_to_pose", std::bind(&RobotMover::handleMovePoseRequest, this, std::placeholders::_1, std::placeholders::_2));
+    move_to_joint_position_service_ = this->create_service<ur5_robot_gripper::srv::MoveToJointPosition>(
+            "move_to_joint_position", std::bind(&RobotMover::handleMoveJointPositionRequest, this, std::placeholders::_1, std::placeholders::_2));
     
     set_constraint_service_ = this->create_service<ur5_robot_gripper::srv::SetConstraints>(
     "set_constraints", std::bind(&RobotMover::handleSetConstraintsRequest, this, std::placeholders::_1, std::placeholders::_2));
@@ -331,6 +333,23 @@ void RobotMover::handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::
         }
     }
 
+void RobotMover::handleMoveJointPositionRequest(const std::shared_ptr<ur5_robot_gripper::srv::MoveToJointPosition::Request> request,
+                                std::shared_ptr<ur5_robot_gripper::srv::MoveToJointPosition::Response> response)
+    {
+        // 延迟确保状态信息已经更新
+        RCLCPP_INFO(this->get_logger(), "Get Pose in call.");
+        printCurrentPose();  // 获取当前姿态
+
+        bool success = moveToJointPosition(request->joint_positions, request->velocity_scaling);
+        
+        if (success)
+        {
+            response->success = true;
+            response->message = "Motion plan generated successfully.";
+            response->trajectory = current_plan_.trajectory_.joint_trajectory;
+        }
+    }
+
 // Action goal处理函数
 rclcpp_action::GoalResponse RobotMover::handleGoal([[maybe_unused]] const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToPositionAction::Goal> goal)
 {
@@ -416,7 +435,7 @@ void RobotMover::executePoseGoal(const std::shared_ptr<GoalHandleMoveToPoseActio
     auto feedback = std::make_shared<MoveToPoseAction::Feedback>();
     auto result = std::make_shared<MoveToPoseAction::Result>();
 
-    bool reachable = isPoseReachableWithCollisionCheck(goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw);
+    // bool reachable = isPoseReachableWithCollisionCheck(goal->px, goal->py, goal->pz, goal->qx, goal->qy, goal->qz, goal->qw);
     
     // 调用 moveToPose
     // moveToPose 执行完毕后，检查规划和执行结果
@@ -433,14 +452,17 @@ void RobotMover::executePoseGoal(const std::shared_ptr<GoalHandleMoveToPoseActio
 
 // Add a method for move to joint position
 // Function to move the robot to a specific joint position
-void RobotMover::moveToJointPosition(const std::vector<double>& joint_angles, double velocity_scaling) {
+bool RobotMover::moveToJointPosition(const std::vector<double>& joint_angles, double velocity_scaling) {
     move_group_interface_.setJointValueTarget(joint_angles); // Set target joint positions
     auto plan_opt = genPlan(velocity_scaling); // Generate the motion plan
     if (!plan_opt) {
         RCLCPP_ERROR(this->get_logger(), "Failed to generate motion plan.");
+        return false;
     }
     // 解包 std::optional
     current_plan_ = *plan_opt;
+
+    return true;
 }
 
 // Goal handling function for MoveToJointPosition
