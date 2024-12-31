@@ -47,7 +47,7 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
       std::bind(&RobotMover::handlePoseAccepted, this, std::placeholders::_1)
     );
     // Create the action server for MoveToJointPosition
-    this->move_to_joint_position_action_server_ = rclcpp_action::create_server<MoveToJointPosition>(
+    this->move_to_joint_position_action_server_ = rclcpp_action::create_server<MoveToJointPositionAction>(
       this,
       "move_to_joint_position_action",
       std::bind(&RobotMover::handleJointGoal, this, std::placeholders::_1, std::placeholders::_2),
@@ -468,7 +468,7 @@ bool RobotMover::moveToJointPosition(const std::vector<double>& joint_angles, do
 // Goal handling function for MoveToJointPosition
 // test: ros2 action send_goal /move_to_joint_position_action ur5_robot_gripper/action/MoveToJointPosition "{joint_positions: [0, -1.57, 1.57, -1.57, -1.57, 0], velocity_scaling: 0.5}"
 
-rclcpp_action::GoalResponse RobotMover::handleJointGoal([[maybe_unused]] const rclcpp_action::GoalUUID& uuid, [[maybe_unused]] std::shared_ptr<const MoveToJointPosition::Goal> goal) {
+rclcpp_action::GoalResponse RobotMover::handleJointGoal([[maybe_unused]] const rclcpp_action::GoalUUID& uuid, [[maybe_unused]] std::shared_ptr<const MoveToJointPositionAction::Goal> goal) {
     RCLCPP_INFO(this->get_logger(), "Received action goal to move to joint positions");
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -490,8 +490,8 @@ void RobotMover::handleJointAccepted(const std::shared_ptr<GoalHandleMoveToJoint
 void RobotMover::executeJointGoal(const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle) {
     RCLCPP_INFO(this->get_logger(), "Executing move to joint positions action goal...");
     const auto goal = goal_handle->get_goal();
-    auto feedback = std::make_shared<MoveToJointPosition::Feedback>();
-    auto result = std::make_shared<MoveToJointPosition::Result>();
+    auto feedback = std::make_shared<MoveToJointPositionAction::Feedback>();
+    auto result = std::make_shared<MoveToJointPositionAction::Result>();
 
     // Move to the specified joint positions
     moveToJointPosition(goal->joint_positions, goal->velocity_scaling);

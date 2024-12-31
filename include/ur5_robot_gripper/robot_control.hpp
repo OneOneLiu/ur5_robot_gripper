@@ -19,7 +19,7 @@
 #include "ur5_robot_gripper/srv/move_to_joint_position.hpp"  // Custom service for moving to a jointposition
 #include "ur5_robot_gripper/action/move_to_position_action.hpp"  // MoveToPosition action definition
 #include "ur5_robot_gripper/action/move_to_pose_action.hpp"  // MoveToPose action definition
-#include "ur5_robot_gripper/action/move_to_joint_position.hpp"  // MoveToJointPosition action definition
+#include "ur5_robot_gripper/action/move_to_joint_position_action.hpp"  // MoveToJointPosition action definition
 #include <Eigen/Geometry> // For visualizing shapes
 #include <iostream>
 #include <vector>
@@ -38,8 +38,8 @@ using MoveToPoseAction = ur5_robot_gripper::action::MoveToPoseAction;
 using GoalHandleMoveToPoseAction = rclcpp_action::ServerGoalHandle<MoveToPoseAction>;
 
 // Type definitions for MoveToJointPosition
-using MoveToJointPosition = ur5_robot_gripper::action::MoveToJointPosition;
-using GoalHandleMoveToJointPosition = rclcpp_action::ServerGoalHandle<MoveToJointPosition>;
+using MoveToJointPositionAction = ur5_robot_gripper::action::MoveToJointPositionAction;
+using GoalHandleMoveToJointPosition = rclcpp_action::ServerGoalHandle<MoveToJointPositionAction>;
 
 class RobotMover : public rclcpp::Node
 {
@@ -107,9 +107,9 @@ private:
     void executePoseGoal(const std::shared_ptr<GoalHandleMoveToPoseAction> goal_handle);
 
     // Action for MoveToJointPosition
-    rclcpp_action::Server<MoveToJointPosition>::SharedPtr move_to_joint_position_action_server_;
+    rclcpp_action::Server<MoveToJointPositionAction>::SharedPtr move_to_joint_position_action_server_;
 
-    rclcpp_action::GoalResponse handleJointGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToJointPosition::Goal> goal);
+    rclcpp_action::GoalResponse handleJointGoal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveToJointPositionAction::Goal> goal);
     rclcpp_action::CancelResponse handleJointCancel(const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle);
     void handleJointAccepted(const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle);
     void executeJointGoal(const std::shared_ptr<GoalHandleMoveToJointPosition> goal_handle);

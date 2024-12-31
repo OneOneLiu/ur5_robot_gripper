@@ -43,7 +43,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/MoveToPoseAction.action"
   "action/MoveGripperAction.action"
   "action/ExecuteGrasp.action"
-  "action/MoveToJointPosition.action"
+  "action/MoveToJointPositionAction.action"
   DEPENDENCIES builtin_interfaces geometry_msgs action_msgs trajectory_msgs
 )
 
