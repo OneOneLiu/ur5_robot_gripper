@@ -1,6 +1,7 @@
 # Goal definition
 int32 tube_index  # The index of the tube to be grasped
-
+int32 rack_hole_i
+int32 rack_hole_j
 ---
 # Result definition
 bool success  # Indicates if the grasp action was successful
