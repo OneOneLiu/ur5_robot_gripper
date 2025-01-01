@@ -290,7 +290,9 @@ void RobotMover::handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::
         // 定义规划器列表
         std::vector<std::string> planners = {
             "SBL", "LBKPIECE", "BKPIECE", "KPIECE", "RRT",
-            "RRTConnect", "RRTstar", "TRRT", "PRM", "PRMstar"
+            "RRTConnect", "RRTstar", "TRRT", "PRM", "PRMstar",
+            "EST", "BiEST", "ProjEST", "LazyPRM", "LazyPRMstar",
+            "SPARS", "SPARStwo", "BFMT", "BiTRRT", "FMT", "PDST"
         };
         if(!success){
             RCLCPP_WARN(this->get_logger(), "Motion plan failed using default planner, trying other planners.");
@@ -572,7 +574,7 @@ void RobotMover::setConstraints(bool use_pos_cons,double box_dx, double box_dy, 
     move_group_interface_.setPathConstraints(constraints);
     // It’s helpful to increase the default planning time, as planning with constraints can be slower.
     // I think 20 s should be enough for most cases, if the planner cannot sovle the problem in 20 s, it may not be able to solve it in a longer time.
-    move_group_interface_.setPlanningTime(20.0);
+    move_group_interface_.setPlanningTime(10.0);
 
     // Visualize the box constraint in RViz
     visualizeBox(box_pose, box_dx, box_dy, box_dz);
