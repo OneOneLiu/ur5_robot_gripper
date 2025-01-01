@@ -571,7 +571,8 @@ void RobotMover::setConstraints(bool use_pos_cons,double box_dx, double box_dy, 
     // Apply the constraints to the MoveGroupInterface
     move_group_interface_.setPathConstraints(constraints);
     // It’s helpful to increase the default planning time, as planning with constraints can be slower.
-    move_group_interface_.setPlanningTime(60.0);
+    // I think 20 s should be enough for most cases, if the planner cannot sovle the problem in 20 s, it may not be able to solve it in a longer time.
+    move_group_interface_.setPlanningTime(20.0);
 
     // Visualize the box constraint in RViz
     visualizeBox(box_pose, box_dx, box_dy, box_dz);
