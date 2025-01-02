@@ -626,13 +626,7 @@ bool RobotMover::isPoseReachableWithCollisionCheck(double px, double py, double 
         return false;
     }
 
-    // 创建 RobotState 和 PlanningScene
-    moveit::core::RobotState kinematic_state(kinematic_model);
-    kinematic_state.setToDefaultValues();
-    // planning_scene::PlanningScene planning_scene(kinematic_model);
-
     // 首先更新场景信息
-
     auto planning_scene_monitor = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(node_, "robot_description");
 
     // 等待场景初始化完成
@@ -655,93 +649,245 @@ bool RobotMover::isPoseReachableWithCollisionCheck(double px, double py, double 
         return false;
     }
 
-    // 获取世界中的物体
-    const collision_detection::World& world = *(planning_scene->getWorld());
-    const auto& object_ids = world.getObjectIds(); // 获取所有物体的 ID
+    // 创建 RobotState 和 PlanningScene
+    moveit::core::RobotState kinematic_state(kinematic_model);
+    // kinematic_state.setToDefaultValues();
 
-    RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "Objects in the planning scene:");
-
-    // 遍历并打印每个物体的 ID
-    for (const auto& object_id : object_ids)
-    {
-        RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), " - Object ID: %s", object_id.c_str());
-    }
-
-    if (object_ids.empty())
-    {
-        RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "No objects found in the planning scene.");
-    }
-
-    // 获取附加到机器人的物体
-    const moveit::core::RobotState& robot_state = planning_scene->getCurrentState();
-    std::vector<const moveit::core::AttachedBody*> attached_bodies;
-    robot_state.getAttachedBodies(attached_bodies); // 使用方法的签名填充附加物体列表
-
-    RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "Attached objects to the robot:");
-    for (const auto& attached_body : attached_bodies)
-    {
-        RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), " - Attached Object ID: %s", attached_body->getName().c_str());
-    }
-
-    if (attached_bodies.empty())
-    {
-        RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "No objects attached to the robot.");
-    }
+    // 使用当前机器人关节状态作为IK的起始状态而非默认的零位
+    const moveit::core::RobotState& current_state = planning_scene->getCurrentState();
+    kinematic_state = current_state;
     // 获取关节组
-    const moveit::core::JointModelGroup *joint_model_group = kinematic_model->getJointModelGroup("manipulator");
+    const moveit::core::JointModelGroup* joint_model_group = kinematic_model->getJointModelGroup("manipulator");
     if (!joint_model_group)
     {
         RCLCPP_ERROR(this->get_logger(), "Failed to get joint model group for manipulator!");
         return false;
     }
 
-    // 尝试为目标位姿计算 IK 解
-    bool found_ik = kinematic_state.setFromIK(joint_model_group, target_pose);
-    if (!found_ik)
+    // 尝试多次IK求解
+    int max_attempts = 10;  // 最大尝试次数
+
+    for (int attempt = 1; attempt <= max_attempts; ++attempt)
     {
-        RCLCPP_WARN(this->get_logger(), "The target pose is not reachable (IK solution not found).");
-        return false;
-    }
-
-    // 检查碰撞
-
-    collision_detection::CollisionRequest collision_request;
-    collision_detection::CollisionResult collision_result;
-    collision_result.clear();
-
-    // 显示接触信息
-    collision_request.contacts = true; 
-    collision_request.max_contacts = 1000;
-
-    planning_scene->checkCollision(collision_request, collision_result, kinematic_state);
-
-    std::string collision_object = "";
-    // 判断是否发生碰撞
-    if (collision_result.collision)
-    {
-        RCLCPP_WARN(this->get_logger(), "Collision detected!");
-
-        // // 获取碰撞对象
-        // for (const auto& contact : collision_result.contacts)
-        // {
-        //     collision_object = contact.first.first; // 碰撞的第一个对象
-        //     RCLCPP_WARN(this->get_logger(), "Collision with: %s", collision_object.c_str());
-        // }
-
-        collision_detection::CollisionResult::ContactMap::const_iterator it;
-        for (it = collision_result.contacts.begin(); it != collision_result.contacts.end(); ++it) 
+        // 尝试为目标位姿计算 IK 解
+        bool found_ik = kinematic_state.setFromIK(joint_model_group, target_pose);
+        if (!found_ik)
         {
-            RCLCPP_INFO(this->get_logger(), "Contact between: %s and %s", it->first.first.c_str(), it->first.second.c_str()); 
+            RCLCPP_WARN(this->get_logger(), "IK solution not found in attempt %d.", attempt);
+            continue; // 跳过此轮尝试
+        }
+
+        // 检查当前IK的碰撞
+
+        // 创建碰撞检测请求和结果
+        collision_detection::CollisionRequest collision_request;
+        collision_detection::CollisionResult collision_result;
+        collision_result.clear();
+        collision_request.distance = false; // 禁用距离检测，仅检查实际碰撞
+        collision_request.contacts = true; 
+        collision_request.max_contacts = 1000;
+
+        // 执行碰撞检测
+        planning_scene->checkCollision(collision_request, collision_result, kinematic_state);
+
+        // 检查是否发生碰撞
+        bool in_collision = planning_scene->isStateColliding(kinematic_state, "manipulator", true);
+        if (!in_collision)
+        {
+            RCLCPP_WARN(this->get_logger(), "Found a collision-free IK solution in attempt %d.", attempt);
+            return true;
+        }
+
+        RCLCPP_INFO(this->get_logger(), "IK solution in attempt %d is in collision.", attempt);
+        if (attempt > 3)
+        {
+            // 如果尝试3次还是无解，尝试随机初始化状态
+            kinematic_state.setToRandomPositions(joint_model_group);
         }
     }
-
-    bool in_collision = planning_scene->isStateColliding(kinematic_state, "manipulator", true);
-    if (in_collision)
-    {
-        RCLCPP_WARN(this->get_logger(), "The target pose is reachable but in collision.");
-        return false;
-    }
-
-    RCLCPP_INFO(this->get_logger(), "The target pose is reachable and collision-free.");
-    return true;
+    RCLCPP_INFO(this->get_logger(), "Failed to find a collision-free IK solution after %d attempts.", max_attempts);
+    return false;
 }
+
+//// a detailed logging version of the function
+// bool RobotMover::isPoseReachableWithCollisionCheck(double px, double py, double pz, double qx, double qy, double qz, double qw)
+// {
+//     geometry_msgs::msg::Pose target_pose;
+//     target_pose.position.x = px;
+//     target_pose.position.y = py;
+//     target_pose.position.z = pz;
+//     target_pose.orientation.x = qx;
+//     target_pose.orientation.y = qy;
+//     target_pose.orientation.z = qz;
+//     target_pose.orientation.w = qw;
+
+//     // 使用当前节点的共享指针初始化 RobotModelLoader
+//     robot_model_loader::RobotModelLoader robot_model_loader(node_, "robot_description");
+
+//     // 加载机器人模型
+//     moveit::core::RobotModelPtr kinematic_model = robot_model_loader.getModel();
+//     if (!kinematic_model)
+//     {
+//         RCLCPP_ERROR(this->get_logger(), "Failed to load robot model!");
+//         return false;
+//     }
+
+
+//     // 首先更新场景信息
+//     auto planning_scene_monitor = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(node_, "robot_description");
+
+//     // 等待场景初始化完成
+//     while (!planning_scene_monitor->getPlanningScene())
+//     {
+//         RCLCPP_INFO(node_->get_logger(), "Waiting for PlanningSceneMonitor to initialize...");
+//         rclcpp::sleep_for(std::chrono::milliseconds(100));
+//     }
+
+//     // 更新规划场景
+//     planning_scene_monitor->startStateMonitor(); // 开启机器人状态监控
+//     planning_scene_monitor->startSceneMonitor(); // 监听场景变化
+//     planning_scene_monitor->startWorldGeometryMonitor(); // 监听世界几何变化
+//     planning_scene_monitor->requestPlanningSceneState();
+//     // 获取最新的规划场景
+//     planning_scene::PlanningScenePtr planning_scene = planning_scene_monitor->getPlanningScene();
+//     if (!planning_scene)
+//     {
+//         RCLCPP_ERROR(node_->get_logger(), "Failed to get current planning scene.");
+//         return false;
+//     }
+
+//     // 创建 RobotState 和 PlanningScene
+//     moveit::core::RobotState kinematic_state(kinematic_model);
+//     // kinematic_state.setToDefaultValues();
+
+//     // 使用当前机器人关节状态作为IK的起始状态而非默认的零位
+//     const moveit::core::RobotState& current_state = planning_scene->getCurrentState();
+//     kinematic_state = current_state;
+//     // 获取关节组
+//     const moveit::core::JointModelGroup* joint_model_group = kinematic_model->getJointModelGroup("manipulator");
+//     if (!joint_model_group)
+//     {
+//         RCLCPP_ERROR(this->get_logger(), "Failed to get joint model group for manipulator!");
+//         return false;
+//     }
+
+//     // 尝试为目标位姿计算 IK 解
+//     bool found_ik = kinematic_state.setFromIK(joint_model_group, target_pose);
+//     if (!found_ik)
+//     {
+//         RCLCPP_WARN(this->get_logger(), "The target pose is not reachable (IK solution not found).");
+//         return false;
+//     }
+//     std::vector<double> joint_positions;
+//     kinematic_state.copyJointGroupPositions(joint_model_group, joint_positions);
+
+//     // 显示计算的逆运动学关节状态
+//     const std::vector<std::string>& joint_names = kinematic_state.getVariableNames();
+//     RCLCPP_ERROR(this->get_logger(), "Calculated Inverse Kinematics Joint states:");
+//     for (size_t i = 0; i < joint_names.size(); ++i)
+//     {
+//         RCLCPP_INFO(this->get_logger(), " - %s: %f", joint_names[i].c_str(), joint_positions[i]);
+//     }
+
+//     // 检查碰撞
+
+//     // 获取世界中的物体
+//     const collision_detection::World& world = *(planning_scene->getWorld());
+//     const auto& object_ids = world.getObjectIds(); // 获取所有物体的 ID
+
+//     RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "Objects in the planning scene:");
+
+//     // 遍历并打印每个物体的 ID
+//     for (const auto& object_id : object_ids)
+//     {
+//         RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), " - Object ID: %s", object_id.c_str());
+//     }
+
+//     if (object_ids.empty())
+//     {
+//         RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "No objects found in the planning scene.");
+//     }
+
+//     // 获取附加到机器人的物体
+//     const moveit::core::RobotState& robot_state = planning_scene->getCurrentState();
+//     std::vector<const moveit::core::AttachedBody*> attached_bodies;
+//     robot_state.getAttachedBodies(attached_bodies); // 使用方法的签名填充附加物体列表
+
+//     RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "Attached objects to the robot:");
+//     for (const auto& attached_body : attached_bodies)
+//     {
+//         RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), " - Attached Object ID: %s", attached_body->getName().c_str());
+//     }
+
+//     if (attached_bodies.empty())
+//     {
+//         RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "No objects attached to the robot.");
+//     }
+
+//     // 创建碰撞检测请求和结果
+//     collision_detection::CollisionRequest collision_request;
+//     collision_detection::CollisionResult collision_result;
+//     collision_result.clear();
+//     collision_request.distance = false; // 禁用距离检测，仅检查实际碰撞
+//     collision_request.contacts = true; 
+//     collision_request.max_contacts = 1000;
+
+//     // 执行碰撞检测
+//     planning_scene->checkCollision(collision_request, collision_result, kinematic_state);
+
+//     std::string collision_object = "";
+//     // 判断是否发生碰撞
+//     if (collision_result.collision)
+//     {
+//         RCLCPP_WARN(this->get_logger(), "Collision detected!");
+
+//         collision_detection::CollisionResult::ContactMap::const_iterator it;
+//         for (it = collision_result.contacts.begin(); it != collision_result.contacts.end(); ++it) 
+//         {
+//             RCLCPP_INFO(this->get_logger(), "Contact between: %s and %s", it->first.first.c_str(), it->first.second.c_str()); 
+//         }
+//     }
+
+//     for (const auto& contact : collision_result.contacts)
+//     {
+//         RCLCPP_INFO(this->get_logger(), "Contact detected between: %s and %s",
+//                     contact.first.first.c_str(), contact.first.second.c_str());
+//         for (const auto& point : contact.second)
+//         {
+//             RCLCPP_INFO(this->get_logger(), "Contact point: [%f, %f, %f]",
+//                         point.pos.x(), point.pos.y(), point.pos.z());
+//         }
+//     }
+
+//     // 显示碰撞接触点
+//     visual_tools_.deleteAllMarkers();
+//     std_msgs::msg::ColorRGBA color_with_alpha;
+//     color_with_alpha.r = 1.0; // Grey (R=G=B)
+//     color_with_alpha.g = 0.5;
+//     color_with_alpha.b = 0.5;
+//     color_with_alpha.a = 0.5; 
+//     for (const auto& contact : collision_result.contacts)
+//     {
+//         for (const auto& point : contact.second)
+//         {
+//             // 在接触点绘制一个小球
+//             visual_tools_.publishSphere(
+//                 Eigen::Vector3d(point.pos.x(), point.pos.y(), point.pos.z()));
+
+//         }
+//     }
+
+//     // 发布所有标记
+//     visual_tools_.trigger();
+
+//     // 检查是否发生碰撞
+//     bool in_collision = planning_scene->isStateColliding(kinematic_state, "manipulator", true);
+//     if (in_collision)
+//     {
+//         RCLCPP_WARN(this->get_logger(), "The target pose is reachable but in collision.");
+//         return false;
+//     }
+
+//     RCLCPP_INFO(this->get_logger(), "The target pose is reachable and collision-free.");
+//     return true;
+// }
