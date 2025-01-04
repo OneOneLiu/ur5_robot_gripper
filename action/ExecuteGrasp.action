@@ -2,6 +2,7 @@
 int32 tube_index  # The index of the tube to be grasped
 int32 rack_hole_i
 int32 rack_hole_j
+string push_direction # from left or from right
 ---
 # Result definition
 bool success  # Indicates if the grasp action was successful
