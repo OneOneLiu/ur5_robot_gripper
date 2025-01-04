@@ -292,7 +292,7 @@ void RobotMover::handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::
             "SBL", "LBKPIECE", "BKPIECE", "KPIECE", "RRT",
             "RRTConnect", "RRTstar", "TRRT", "PRM", "PRMstar",
             "EST", "BiEST", "ProjEST", "LazyPRM", "LazyPRMstar",
-            "SPARS", "SPARStwo", "BFMT", "BiTRRT", "FMT", "PDST"
+            "SPARS", "SPARStwo", "BFMT", "BiTRRT", "PDST"
         };
         if(!success){
             RCLCPP_WARN(this->get_logger(), "Motion plan failed using default planner, trying other planners.");
