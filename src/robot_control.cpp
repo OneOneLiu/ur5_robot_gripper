@@ -574,7 +574,7 @@ void RobotMover::setConstraints(bool use_pos_cons,double box_dx, double box_dy, 
     move_group_interface_.setPathConstraints(constraints);
     // It’s helpful to increase the default planning time, as planning with constraints can be slower.
     // I think 20 s should be enough for most cases, if the planner cannot sovle the problem in 20 s, it may not be able to solve it in a longer time.
-    move_group_interface_.setPlanningTime(10.0);
+    move_group_interface_.setPlanningTime(5.0);
 
     // Visualize the box constraint in RViz
     visualizeBox(box_pose, box_dx, box_dy, box_dz);
@@ -695,6 +695,16 @@ bool RobotMover::isPoseReachableWithCollisionCheck(double px, double py, double 
         if (!in_collision)
         {
             RCLCPP_WARN(this->get_logger(), "Found a collision-free IK solution in attempt %d.", attempt);
+            std::vector<double> joint_positions;
+            kinematic_state.copyJointGroupPositions(joint_model_group, joint_positions);
+
+            // 显示计算的逆运动学关节状态
+            const std::vector<std::string>& joint_names = kinematic_state.getVariableNames();
+            RCLCPP_ERROR(this->get_logger(), "Calculated Inverse Kinematics Joint states:");
+            for (size_t i = 0; i < joint_names.size(); ++i)
+            {
+                RCLCPP_INFO(this->get_logger(), " - %s: %f", joint_names[i].c_str(), joint_positions[i]);
+            }
             return true;
         }
 
