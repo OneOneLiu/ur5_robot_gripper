@@ -543,7 +543,7 @@ void RobotMover::setConstraints(bool use_pos_cons,double box_dx, double box_dy, 
 
     // Create orientation constraint
     moveit_msgs::msg::OrientationConstraint orientation_constraint;
-    orientation_constraint.header.frame_id = move_group_interface_.getPoseReferenceFrame();
+    orientation_constraint.header.frame_id = move_group_interface_.getPoseReferenceFrame(); // Use the base link as the reference frame
     orientation_constraint.link_name = move_group_interface_.getEndEffectorLink();
 
     if (keep_end_orientation) {
@@ -558,7 +558,9 @@ void RobotMover::setConstraints(bool use_pos_cons,double box_dx, double box_dy, 
 
     orientation_constraint.absolute_x_axis_tolerance = angle_tolerance;
     orientation_constraint.absolute_y_axis_tolerance = angle_tolerance;
-    orientation_constraint.absolute_z_axis_tolerance = angle_tolerance;
+    orientation_constraint.absolute_z_axis_tolerance = std::numeric_limits<double>::infinity(); // Do not constrain world Z axis rotation: 
+    // https://github.com/moveit/moveit2/issues/2614
+    // https://github.com/moveit/moveit2/pull/2775
     orientation_constraint.weight = 1.0;
 
     // Create the constraints message
