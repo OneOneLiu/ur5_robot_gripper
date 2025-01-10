@@ -304,25 +304,20 @@ void RobotMover::handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::
                 move_group_interface_.setPlannerId(planner);
                 RCLCPP_INFO(this->get_logger(), "Trying planner: %s", planner.c_str());
 
-                // 尝试两次
-                for (int attempt = 1; attempt <= 2; ++attempt)
+                success = moveToPose(request->px, request->py, request->pz, request->qx, request->qy, request->qz, request->qw, request->velocity_scaling);
+                if (success)
                 {
-                    RCLCPP_INFO(this->get_logger(), "Attempt %d with planner %s", attempt, planner.c_str());
-                    success = moveToPose(request->px, request->py, request->pz, request->qx, request->qy, request->qz, request->qw, request->velocity_scaling);
-                    if (success)
-                    {
-                        RCLCPP_INFO(this->get_logger(), "Motion plan succeeded using planner %s on attempt %d.", planner.c_str(), attempt);
-                        response->success = true;
-                        response->message = "Motion plan generated successfully.";
-                        response->trajectory = current_plan_.trajectory_.joint_trajectory;
-                        // 恢复默认规划器
-                        move_group_interface_.setPlannerId(default_planner);
-                        return;
-                    }
-                    else
-                    {
-                        RCLCPP_WARN(this->get_logger(), "Motion plan failed using planner %s on attempt %d.", planner.c_str(), attempt);
-                    }
+                    RCLCPP_INFO(this->get_logger(), "Motion plan succeeded using planner %s .", planner.c_str());
+                    response->success = true;
+                    response->message = "Motion plan generated successfully.";
+                    response->trajectory = current_plan_.trajectory_.joint_trajectory;
+                    // 恢复默认规划器
+                    move_group_interface_.setPlannerId(default_planner);
+                    return;
+                }
+                else
+                {
+                    RCLCPP_WARN(this->get_logger(), "Motion plan failed using planner %s.", planner.c_str());
                 }
             }
             // 恢复默认规划器
