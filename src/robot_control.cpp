@@ -289,10 +289,9 @@ void RobotMover::handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::
 
         // 定义规划器列表
         std::vector<std::string> planners = {
-            "SBL", "LBKPIECE", "BKPIECE", "KPIECE", "RRT",
+            "SBL", "LBKPIECE", "BKPIECE", "KPIECE",
             "RRTConnect", "RRTstar", "TRRT", "PRM", "PRMstar",
-            "EST", "BiEST", "ProjEST", "LazyPRM", "LazyPRMstar",
-            "SPARS", "SPARStwo", "BFMT", "BiTRRT", "PDST"
+            "LazyPRM", "LazyPRMstar"
         };
         if(!success){
             RCLCPP_WARN(this->get_logger(), "Motion plan failed using default planner, trying other planners.");
@@ -553,6 +552,7 @@ void RobotMover::setConstraints(bool use_pos_cons,double box_dx, double box_dy, 
 
     orientation_constraint.absolute_x_axis_tolerance = angle_tolerance;
     orientation_constraint.absolute_y_axis_tolerance = angle_tolerance;
+    // orientation_constraint.absolute_z_axis_tolerance = angle_tolerance;
     orientation_constraint.absolute_z_axis_tolerance = std::numeric_limits<double>::infinity(); // Do not constrain world Z axis rotation: 
     // https://github.com/moveit/moveit2/issues/2614
     // https://github.com/moveit/moveit2/pull/2775
@@ -571,7 +571,7 @@ void RobotMover::setConstraints(bool use_pos_cons,double box_dx, double box_dy, 
     move_group_interface_.setPathConstraints(constraints);
     // It’s helpful to increase the default planning time, as planning with constraints can be slower.
     // I think 20 s should be enough for most cases, if the planner cannot sovle the problem in 20 s, it may not be able to solve it in a longer time.
-    move_group_interface_.setPlanningTime(5.0);
+    move_group_interface_.setPlanningTime(3.0);
 
     // Visualize the box constraint in RViz
     visualizeBox(box_pose, box_dx, box_dy, box_dz);
