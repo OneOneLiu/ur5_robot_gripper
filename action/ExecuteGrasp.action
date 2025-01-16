@@ -3,6 +3,7 @@ int32 tube_index  # The index of the tube to be grasped
 int32 rack_hole_i
 int32 rack_hole_j
 string push_direction # from left or from right
+int32 push_point # pushing point of the sampled points [start from the cap side,(0, 1, 2, ..., num of sampled points)]
 ---
 # Result definition
 bool success  # Indicates if the grasp action was successful
