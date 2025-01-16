@@ -11,7 +11,9 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
           "base_link",                     // Base frame
           "/move_group_tutorial",    // Marker topic NOTE: this topic is published by the visual tools and
           move_group_interface_.getRobotModel() // Robot model
-      )
+      ),
+    cache_duration_(2.0),   // 缓存保存时长
+    cache_interval_(0.05) // 缓存更新间隔
 {
     // Create the service for printing the current pose
     print_current_pose_service_ = this->create_service<ur5_robot_gripper::srv::PrintPose>(
@@ -28,6 +30,11 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
     set_constraint_service_ = this->create_service<ur5_robot_gripper::srv::SetConstraints>(
     "set_constraints", std::bind(&RobotMover::handleSetConstraintsRequest, this, std::placeholders::_1, std::placeholders::_2));
 
+    // 初始化定时器
+    pose_cache_timer_ = this->create_wall_timer(
+        std::chrono::duration<double>(cache_interval_),  // 定时器触发间隔
+        [this]() { updatePoseCache(); }                 // 定时器回调函数
+    );
 
     // 创建 Action Server
     this->action_server_ = rclcpp_action::create_server<MoveToPositionAction>(
@@ -228,32 +235,79 @@ bool RobotMover::executePlan(const moveit::planning_interface::MoveGroupInterfac
   return true;  // 执行成功
 }
 
+void RobotMover::getRobotStateRequest(
+    const std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Request> request,
+    std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Response> response) {
+    
+    // 获取当前姿态和关节角
+    auto current_pose = move_group_interface_.getCurrentPose().pose;
+    auto current_joint_values = move_group_interface_.getCurrentJointValues();
 
-// Service callback function to handle pose and joint angle printing requests
-void RobotMover::getRobotStateRequest(const std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Request> /*request*/,
-                                    std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Response> response) {
-    // Get the current pose and joint angles
-    auto current_pose = move_group_interface_.getCurrentPose().pose; 
-    auto current_joint_values = move_group_interface_.getCurrentJointValues(); 
+    // 如果请求的时间戳为 0，则返回当前姿态
+    if (request->requested_timestamp.sec == 0 && request->requested_timestamp.nanosec == 0) {
+        RCLCPP_INFO(this->get_logger(), "Received request with zero timestamp. Returning current pose.");
 
-    // Print both pose and joint angles
-    // RCLCPP_INFO(node_->get_logger(), "Service Callback: Current Pose and Joint Angles:");
-    // printCurrentPose(); // Print pose and joint angles
+        // 填充响应
+        response->pose = current_pose;
+        response->joint_angles = current_joint_values;
+        response->success = true;
 
-    // Set the pose in the response
-    response->pose.position.x = current_pose.position.x;
-    response->pose.position.y = current_pose.position.y;
-    response->pose.position.z = current_pose.position.z;
-    response->pose.orientation.x = current_pose.orientation.x;
-    response->pose.orientation.y = current_pose.orientation.y;
-    response->pose.orientation.z = current_pose.orientation.z;
-    response->pose.orientation.w = current_pose.orientation.w;
+        // 设置当前时间戳作为实际时间戳
+        response->actual_timestamp = this->get_clock()->now();
+        return;
+    }
 
-    // Set the joint angles in the response
-    response->joint_angles = current_joint_values;
+    // 转换请求中的时间戳
+    rclcpp::Time requested_time(request->requested_timestamp.sec, request->requested_timestamp.nanosec, this->get_clock()->get_clock_type());
 
-    // Set the response to indicate success
+    // 检查缓存是否为空
+    if (pose_cache_.empty()) {
+        RCLCPP_WARN(this->get_logger(), "Pose cache is empty. Cannot fulfill request.");
+        response->success = false;
+        return;
+    }
+
+    // 检查时间戳是否在缓存时间范围内
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+    rclcpp::Time earliest_time = pose_cache_.front().first;
+    rclcpp::Time latest_time = pose_cache_.back().first;
+
+    if (requested_time < earliest_time || requested_time > latest_time) {
+        RCLCPP_WARN(this->get_logger(),
+                    "Requested timestamp is out of cache range. Requested: %.3f, Cache range: [%.3f, %.3f], returning current pose",
+                    requested_time.seconds(), earliest_time.seconds(), latest_time.seconds());
+        // 填充响应
+        response->pose = current_pose;
+        response->joint_angles = current_joint_values;
+        response->success = true;
+
+        // 设置当前时间戳作为实际时间戳
+        response->actual_timestamp = this->get_clock()->now();
+        return;
+    }
+
+    // 查找缓存中最接近的时间戳
+    auto closest_pose = pose_cache_.front();
+    double min_time_diff = std::numeric_limits<double>::max();
+
+    for (const auto &entry : pose_cache_) {
+        double time_diff = std::abs((entry.first - requested_time).seconds());
+        if (time_diff < min_time_diff) {
+            closest_pose = entry;
+            min_time_diff = time_diff;
+        }
+    }
+
+    // 填充响应
+    response->pose = closest_pose.second;
+    response->joint_angles = move_group_interface_.getCurrentJointValues();  // 如果需要，可以使用缓存的关节角
     response->success = true;
+    response->actual_timestamp.sec = closest_pose.first.seconds();
+    response->actual_timestamp.nanosec = closest_pose.first.nanoseconds() % 1'000'000'000;
+
+    RCLCPP_INFO(this->get_logger(),
+                "Returned pose for requested timestamp %.3f. Actual timestamp: %.3f",
+                requested_time.seconds(), closest_pose.first.seconds());
 }
 
 void RobotMover::handleMovePositionRequest(const std::shared_ptr<ur5_robot_gripper::srv::MoveToPosition::Request> request,
@@ -716,185 +770,72 @@ bool RobotMover::isPoseReachableWithCollisionCheck(double px, double py, double 
     return false;
 }
 
-//// a detailed logging version of the function
-// bool RobotMover::isPoseReachableWithCollisionCheck(double px, double py, double pz, double qx, double qy, double qz, double qw)
-// {
-//     geometry_msgs::msg::Pose target_pose;
-//     target_pose.position.x = px;
-//     target_pose.position.y = py;
-//     target_pose.position.z = pz;
-//     target_pose.orientation.x = qx;
-//     target_pose.orientation.y = qy;
-//     target_pose.orientation.z = qz;
-//     target_pose.orientation.w = qw;
+// 定时器回调：更新缓存
+void RobotMover::updatePoseCache() {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
 
-//     // 使用当前节点的共享指针初始化 RobotModelLoader
-//     robot_model_loader::RobotModelLoader robot_model_loader(node_, "robot_description");
+    // 获取当前时间和姿态
+    auto now = this->get_clock()->now();
+    auto current_pose = move_group_interface_.getCurrentPose().pose;
 
-//     // 加载机器人模型
-//     moveit::core::RobotModelPtr kinematic_model = robot_model_loader.getModel();
-//     if (!kinematic_model)
-//     {
-//         RCLCPP_ERROR(this->get_logger(), "Failed to load robot model!");
-//         return false;
+    // 添加到缓存队列
+    pose_cache_.emplace_back(now, current_pose);
+
+    // 移除超过缓存时间的数据
+    while (!pose_cache_.empty() && (now - pose_cache_.front().first).seconds() > cache_duration_) {
+        pose_cache_.pop_front();
+    }
+
+    // 打印当前缓存内容 (debugging)
+    RCLCPP_DEBUG(this->get_logger(), "Current Pose Cache (size: %zu):", pose_cache_.size());
+    for (const auto &entry : pose_cache_) {
+        auto time = entry.first;
+        auto pose = entry.second;
+
+        RCLCPP_DEBUG(this->get_logger(),
+                    "Timestamp: %.3f, Position: [x=%.3f, y=%.3f, z=%.3f], Orientation: [qx=%.3f, qy=%.3f, qz=%.3f, qw=%.3f]",
+                    time.seconds(),
+                    pose.position.x, pose.position.y, pose.position.z,
+                    pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
+    }
+}
+
+// 查询缓存：获取指定时间的姿态
+geometry_msgs::msg::Pose RobotMover::getPoseAtTime(const rclcpp::Time &requested_time) {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+
+    if (pose_cache_.empty()) {
+        throw std::runtime_error("Pose cache is empty.");
+    }
+
+    // 找到与请求时间最接近的姿态
+    auto closest_it = pose_cache_.begin();
+    for (auto it = pose_cache_.begin(); it != pose_cache_.end(); ++it) {
+        if (std::abs((it->first - requested_time).seconds()) <
+            std::abs((closest_it->first - requested_time).seconds())) {
+            closest_it = it;
+        }
+    }
+
+    return closest_it->second; // 返回姿态
+}
+
+// // 服务回调：返回请求时间的姿态
+// void RobotMover::getRobotStateRequest(
+//     const std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Request> request,
+//     std::shared_ptr<ur5_robot_gripper::srv::PrintPose::Response> response) {
+//     try {
+//         // 转换请求时间
+//         rclcpp::Time requested_time(request->timestamp.sec, request->timestamp.nanosec, this->get_clock()->get_clock_type());
+
+//         // 查询姿态
+//         auto pose = getPoseAtTime(requested_time);
+
+//         // 填充响应
+//         response->pose = pose;
+//         response->success = true;
+//     } catch (const std::exception &e) {
+//         RCLCPP_ERROR(this->get_logger(), "Failed to get pose at requested time: %s", e.what());
+//         response->success = false;
 //     }
-
-
-//     // 首先更新场景信息
-//     auto planning_scene_monitor = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(node_, "robot_description");
-
-//     // 等待场景初始化完成
-//     while (!planning_scene_monitor->getPlanningScene())
-//     {
-//         RCLCPP_INFO(node_->get_logger(), "Waiting for PlanningSceneMonitor to initialize...");
-//         rclcpp::sleep_for(std::chrono::milliseconds(100));
-//     }
-
-//     // 更新规划场景
-//     planning_scene_monitor->startStateMonitor(); // 开启机器人状态监控
-//     planning_scene_monitor->startSceneMonitor(); // 监听场景变化
-//     planning_scene_monitor->startWorldGeometryMonitor(); // 监听世界几何变化
-//     planning_scene_monitor->requestPlanningSceneState();
-//     // 获取最新的规划场景
-//     planning_scene::PlanningScenePtr planning_scene = planning_scene_monitor->getPlanningScene();
-//     if (!planning_scene)
-//     {
-//         RCLCPP_ERROR(node_->get_logger(), "Failed to get current planning scene.");
-//         return false;
-//     }
-
-//     // 创建 RobotState 和 PlanningScene
-//     moveit::core::RobotState kinematic_state(kinematic_model);
-//     // kinematic_state.setToDefaultValues();
-
-//     // 使用当前机器人关节状态作为IK的起始状态而非默认的零位
-//     const moveit::core::RobotState& current_state = planning_scene->getCurrentState();
-//     kinematic_state = current_state;
-//     // 获取关节组
-//     const moveit::core::JointModelGroup* joint_model_group = kinematic_model->getJointModelGroup("manipulator");
-//     if (!joint_model_group)
-//     {
-//         RCLCPP_ERROR(this->get_logger(), "Failed to get joint model group for manipulator!");
-//         return false;
-//     }
-
-//     // 尝试为目标位姿计算 IK 解
-//     bool found_ik = kinematic_state.setFromIK(joint_model_group, target_pose);
-//     if (!found_ik)
-//     {
-//         RCLCPP_WARN(this->get_logger(), "The target pose is not reachable (IK solution not found).");
-//         return false;
-//     }
-//     std::vector<double> joint_positions;
-//     kinematic_state.copyJointGroupPositions(joint_model_group, joint_positions);
-
-//     // 显示计算的逆运动学关节状态
-//     const std::vector<std::string>& joint_names = kinematic_state.getVariableNames();
-//     RCLCPP_ERROR(this->get_logger(), "Calculated Inverse Kinematics Joint states:");
-//     for (size_t i = 0; i < joint_names.size(); ++i)
-//     {
-//         RCLCPP_INFO(this->get_logger(), " - %s: %f", joint_names[i].c_str(), joint_positions[i]);
-//     }
-
-//     // 检查碰撞
-
-//     // 获取世界中的物体
-//     const collision_detection::World& world = *(planning_scene->getWorld());
-//     const auto& object_ids = world.getObjectIds(); // 获取所有物体的 ID
-
-//     RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "Objects in the planning scene:");
-
-//     // 遍历并打印每个物体的 ID
-//     for (const auto& object_id : object_ids)
-//     {
-//         RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), " - Object ID: %s", object_id.c_str());
-//     }
-
-//     if (object_ids.empty())
-//     {
-//         RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "No objects found in the planning scene.");
-//     }
-
-//     // 获取附加到机器人的物体
-//     const moveit::core::RobotState& robot_state = planning_scene->getCurrentState();
-//     std::vector<const moveit::core::AttachedBody*> attached_bodies;
-//     robot_state.getAttachedBodies(attached_bodies); // 使用方法的签名填充附加物体列表
-
-//     RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "Attached objects to the robot:");
-//     for (const auto& attached_body : attached_bodies)
-//     {
-//         RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), " - Attached Object ID: %s", attached_body->getName().c_str());
-//     }
-
-//     if (attached_bodies.empty())
-//     {
-//         RCLCPP_INFO(rclcpp::get_logger("PlanningScene"), "No objects attached to the robot.");
-//     }
-
-//     // 创建碰撞检测请求和结果
-//     collision_detection::CollisionRequest collision_request;
-//     collision_detection::CollisionResult collision_result;
-//     collision_result.clear();
-//     collision_request.distance = false; // 禁用距离检测，仅检查实际碰撞
-//     collision_request.contacts = true; 
-//     collision_request.max_contacts = 1000;
-
-//     // 执行碰撞检测
-//     planning_scene->checkCollision(collision_request, collision_result, kinematic_state);
-
-//     std::string collision_object = "";
-//     // 判断是否发生碰撞
-//     if (collision_result.collision)
-//     {
-//         RCLCPP_WARN(this->get_logger(), "Collision detected!");
-
-//         collision_detection::CollisionResult::ContactMap::const_iterator it;
-//         for (it = collision_result.contacts.begin(); it != collision_result.contacts.end(); ++it) 
-//         {
-//             RCLCPP_INFO(this->get_logger(), "Contact between: %s and %s", it->first.first.c_str(), it->first.second.c_str()); 
-//         }
-//     }
-
-//     for (const auto& contact : collision_result.contacts)
-//     {
-//         RCLCPP_INFO(this->get_logger(), "Contact detected between: %s and %s",
-//                     contact.first.first.c_str(), contact.first.second.c_str());
-//         for (const auto& point : contact.second)
-//         {
-//             RCLCPP_INFO(this->get_logger(), "Contact point: [%f, %f, %f]",
-//                         point.pos.x(), point.pos.y(), point.pos.z());
-//         }
-//     }
-
-//     // 显示碰撞接触点
-//     visual_tools_.deleteAllMarkers();
-//     std_msgs::msg::ColorRGBA color_with_alpha;
-//     color_with_alpha.r = 1.0; // Grey (R=G=B)
-//     color_with_alpha.g = 0.5;
-//     color_with_alpha.b = 0.5;
-//     color_with_alpha.a = 0.5; 
-//     for (const auto& contact : collision_result.contacts)
-//     {
-//         for (const auto& point : contact.second)
-//         {
-//             // 在接触点绘制一个小球
-//             visual_tools_.publishSphere(
-//                 Eigen::Vector3d(point.pos.x(), point.pos.y(), point.pos.z()));
-
-//         }
-//     }
-
-//     // 发布所有标记
-//     visual_tools_.trigger();
-
-//     // 检查是否发生碰撞
-//     bool in_collision = planning_scene->isStateColliding(kinematic_state, "manipulator", true);
-//     if (in_collision)
-//     {
-//         RCLCPP_WARN(this->get_logger(), "The target pose is reachable but in collision.");
-//         return false;
-//     }
-
-//     RCLCPP_INFO(this->get_logger(), "The target pose is reachable and collision-free.");
-//     return true;
 // }

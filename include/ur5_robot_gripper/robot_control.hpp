@@ -24,7 +24,15 @@
 #include <iostream>
 #include <vector>
 
-
+#include <deque>
+#include <mutex>
+#include <utility>
+#include <rclcpp/time.hpp>
+#include <rclcpp/timer.hpp>
+#include <rclcpp/node.hpp>
+#include <chrono>
+#include <cmath>
+#include <stdexcept>
 // For debugging
 #include <nlohmann/json.hpp> 
 #include <fstream>
@@ -126,6 +134,18 @@ private:
     moveit_visual_tools::MoveItVisualTools visual_tools_;
     // Raw pointers are frequently used to refer to the planning group for improved performance.
     const moveit::core::JointModelGroup* joint_model_group_;
+        // 缓存相关
+    std::deque<std::pair<rclcpp::Time, geometry_msgs::msg::Pose>> pose_cache_; // 缓存队列
+    std::mutex cache_mutex_; // 保护缓存队列的互斥锁
+    rclcpp::TimerBase::SharedPtr pose_cache_timer_; // 定时器
+
+    // 缓存持续时间和更新间隔
+    const double cache_duration_ = 2.0; // 缓存持续时间，单位：秒
+    const double cache_interval_ = 0.05; // 缓存更新间隔，单位：秒
+
+    // 私有方法
+    void updatePoseCache(); // 更新缓存的方法
+    geometry_msgs::msg::Pose getPoseAtTime(const rclcpp::Time &requested_time); // 查询缓存的方法
 };
 
 #endif // ROBOT_CONTROL_HPP

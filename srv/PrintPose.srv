@@ -1,7 +1,9 @@
 # Request (empty)
+builtin_interfaces/Time requested_timestamp  # 请求的时间戳
 ---
 
 # Response
 geometry_msgs/Pose pose
 float64[] joint_angles
 bool success
+builtin_interfaces/Time actual_timestamp  # 实际的时间戳
