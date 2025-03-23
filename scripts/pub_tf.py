@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 必须得有上面这一句shepang才能在终端直接运行这个python文件作为ros的node
+# 必须要有上面这一句 shebang 才能直接作为 ROS 2 节点运行
 import math
 import numpy as np
 import rclpy
@@ -17,17 +17,16 @@ def quaternion_from_euler(ai, aj, ak):
     sj = math.sin(aj)
     ck = math.cos(ak)
     sk = math.sin(ak)
-    cc = ci*ck
-    cs = ci*sk
-    sc = si*ck
-    ss = si*sk
+    cc = ci * ck
+    cs = ci * sk
+    sc = si * ck
+    ss = si * sk
 
-    q = np.empty((4, ))
-    q[0] = cj*sc - sj*cs
-    q[1] = cj*ss + sj*cc
-    q[2] = cj*cs - sj*sc
-    q[3] = cj*cc + sj*ss
-
+    q = np.empty((4,))
+    q[0] = cj * sc - sj * cs
+    q[1] = cj * ss + sj * cc
+    q[2] = cj * cs - sj * sc
+    q[3] = cj * cc + sj * ss
     return q
 
 class BaseToVirtualLinkPublisher(Node):
@@ -35,35 +34,56 @@ class BaseToVirtualLinkPublisher(Node):
     def __init__(self):
         super().__init__('base_to_virtual_link_publisher')
 
-        # Initialize the transform broadcaster
+        # 初始化 TF 广播器
         self.tf_broadcaster = TransformBroadcaster(self)
 
-        # Create a timer to periodically send the transform
-        self.timer = self.create_timer(0.1, self.publish_transform)
+        # 创建定时器，定时发布 TF
+        self.timer = self.create_timer(0.1, self.publish_transforms)
 
-    def publish_transform(self):
-        t = TransformStamped()
+    def publish_transforms(self):
+        now = self.get_clock().now().to_msg()
+        transforms = []
 
-        # Set the transform header
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'world'  # Parent frame
-        t.child_frame_id = 'isaac_world'     # Child frame
+        # -------------------------------
+        # TF1: world -> isaac_world
+        # -------------------------------
+        t1 = TransformStamped()
+        t1.header.stamp = now
+        t1.header.frame_id = 'world'
+        t1.child_frame_id = 'isaac_world'
 
-        # Set the translation (assuming no translation, only rotation)
-        t.transform.translation.x = 0.0
-        t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.0
+        t1.transform.translation.x = 0.0
+        t1.transform.translation.y = 0.0
+        t1.transform.translation.z = 0.0
 
-        # Set the rotation (around the Z axis)
-        theta = math.radians(-90)
-        q = quaternion_from_euler(0, 0, theta)
-        t.transform.rotation.x = q[0]
-        t.transform.rotation.y = q[1]
-        t.transform.rotation.z = q[2]
-        t.transform.rotation.w = q[3]
+        q1 = quaternion_from_euler(0, 0, math.radians(-90))  # Z轴旋转 -90°
+        t1.transform.rotation.x = q1[0]
+        t1.transform.rotation.y = q1[1]
+        t1.transform.rotation.z = q1[2]
+        t1.transform.rotation.w = q1[3]
+        transforms.append(t1)
 
-        # Broadcast the transform
-        self.tf_broadcaster.sendTransform(t)
+        # -------------------------------
+        # TF2: tool0 -> camera_link
+        # -------------------------------
+        t2 = TransformStamped()
+        t2.header.stamp = now
+        t2.header.frame_id = 'tool0'
+        t2.child_frame_id = 'camera_link'
+
+        t2.transform.translation.x = 0.0
+        t2.transform.translation.y = -0.07
+        t2.transform.translation.z = 0.0
+
+        q2 = quaternion_from_euler(0, 0, math.radians(90)) 
+        t2.transform.rotation.x = q2[0]
+        t2.transform.rotation.y = q2[1]
+        t2.transform.rotation.z = q2[2]
+        t2.transform.rotation.w = q2[3]
+        transforms.append(t2)
+
+        # ✅ 一次性广播所有 TF
+        self.tf_broadcaster.sendTransform(transforms)
 
 def main():
     rclpy.init()
