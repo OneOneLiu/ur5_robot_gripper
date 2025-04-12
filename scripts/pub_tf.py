@@ -2,6 +2,7 @@
 # 必须要有上面这一句 shebang 才能直接作为 ROS 2 节点运行
 import math
 import numpy as np
+import transforms3d.euler
 import rclpy
 from rclpy.node import Node
 from tf2_ros import TransformBroadcaster
@@ -56,11 +57,11 @@ class BaseToVirtualLinkPublisher(Node):
         t1.transform.translation.y = 0.0
         t1.transform.translation.z = 0.0
 
-        q1 = quaternion_from_euler(0, 0, math.radians(-90))  # Z轴旋转 -90°
-        t1.transform.rotation.x = q1[0]
-        t1.transform.rotation.y = q1[1]
-        t1.transform.rotation.z = q1[2]
-        t1.transform.rotation.w = q1[3]
+        q1 = transforms3d.euler.euler2quat(0, 0, math.radians(-90))  # Z轴旋转 -90°
+        t1.transform.rotation.x = q1[1]
+        t1.transform.rotation.y = q1[2]
+        t1.transform.rotation.z = q1[3]
+        t1.transform.rotation.w = q1[0]
         transforms.append(t1)
 
         # -------------------------------
@@ -75,11 +76,11 @@ class BaseToVirtualLinkPublisher(Node):
         t2.transform.translation.y = -0.07
         t2.transform.translation.z = 0.0
 
-        q2 = quaternion_from_euler(0, 0, math.radians(90)) 
-        t2.transform.rotation.x = q2[0]
-        t2.transform.rotation.y = q2[1]
-        t2.transform.rotation.z = q2[2]
-        t2.transform.rotation.w = q2[3]
+        q2 = transforms3d.euler.euler2quat(0, 0, math.radians(90)) 
+        t2.transform.rotation.x = q2[1]
+        t2.transform.rotation.y = q2[2]
+        t2.transform.rotation.z = q2[3]
+        t2.transform.rotation.w = q2[0]
         transforms.append(t2)
 
         # ✅ 一次性广播所有 TF
