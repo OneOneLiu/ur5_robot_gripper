@@ -139,6 +139,9 @@ private:
     std::mutex cache_mutex_; // 保护缓存队列的互斥锁
     rclcpp::TimerBase::SharedPtr pose_cache_timer_; // 定时器
 
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
+    rclcpp::TimerBase::SharedPtr         pose_timer_;
+
     // 缓存持续时间和更新间隔
     const double cache_duration_ = 2.0; // 缓存持续时间，单位：秒
     const double cache_interval_ = 0.05; // 缓存更新间隔，单位：秒

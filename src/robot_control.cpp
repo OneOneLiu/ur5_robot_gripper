@@ -33,8 +33,34 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
     // 初始化定时器
     pose_cache_timer_ = this->create_wall_timer(
         std::chrono::duration<double>(cache_interval_),  // 定时器触发间隔
-        [this]() { updatePoseCache(); }                 // 定时器回调函数
-    );
+        [this]() { updatePoseCache(); });                 // 定时器回调函数
+    // 1) 创建一个 发布器
+    pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
+        "/current_pose", 10);
+
+    // 2) 建一个 100ms 周期的定时器，回调里读 move_group_interface_ 并发布
+    pose_timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(100),
+        [this]() {
+        // 从 MoveIt 读当前 pose（返回的是 PoseStamped）
+        auto current = move_group_interface_.getCurrentPose();
+
+        // 填一下 header
+        current.header.stamp = this->now();
+        current.header.frame_id = move_group_interface_.getPlanningFrame();
+
+        // 发布
+        pose_pub_->publish(current);
+        RCLCPP_DEBUG(this->get_logger(),
+                    "Published current_pose: [%.3f,%.3f,%.3f] quat[%.3f,%.3f,%.3f,%.3f]",
+                    current.pose.position.x,
+                    current.pose.position.y,
+                    current.pose.position.z,
+                    current.pose.orientation.x,
+                    current.pose.orientation.y,
+                    current.pose.orientation.z,
+                    current.pose.orientation.w);
+        });
 
     // 创建 Action Server
     this->action_server_ = rclcpp_action::create_server<MoveToPositionAction>(
