@@ -1,6 +1,7 @@
 # Goal definition (the position to move the gripper)
 float64 target_position
 float64 velocity_scaling
+bool close_gripper
 
 ---
 # Result definition (success or failure)
