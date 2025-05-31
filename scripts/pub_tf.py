@@ -73,7 +73,7 @@ class BaseToVirtualLinkPublisher(Node):
         t2.child_frame_id = 'camera_link'
 
         t2.transform.translation.x = 0.0
-        t2.transform.translation.y = -0.07
+        t2.transform.translation.y = -0.1
         t2.transform.translation.z = 0.0
 
         q2 = transforms3d.euler.euler2quat(0, 0, math.radians(90)) 
