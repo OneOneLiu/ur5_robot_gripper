@@ -57,7 +57,7 @@ class BaseToVirtualLinkPublisher(Node):
         t1.transform.translation.y = 0.0
         t1.transform.translation.z = 0.0
 
-        q1 = transforms3d.euler.euler2quat(0, 0, math.radians(-90))  # Z轴旋转 -90°
+        q1 = transforms3d.euler.euler2quat(0, 0, math.radians(0))  # 两个坐标系重合，这个关系是由在isaac sim中载入的usd模型的位姿，以及urdf中定义的base_link位姿决定的，urdf一般不会修改，如果在usd中修改了模型的位姿，需要在这里同步修改
         t1.transform.rotation.x = q1[1]
         t1.transform.rotation.y = q1[2]
         t1.transform.rotation.z = q1[3]
