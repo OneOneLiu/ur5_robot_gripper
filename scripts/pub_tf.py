@@ -39,7 +39,7 @@ class BaseToVirtualLinkPublisher(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # 创建定时器，定时发布 TF
-        self.timer = self.create_timer(0.1, self.publish_transforms)
+        self.timer = self.create_timer(0.01, self.publish_transforms)
 
     def publish_transforms(self):
         now = self.get_clock().now().to_msg()
@@ -50,8 +50,8 @@ class BaseToVirtualLinkPublisher(Node):
         # -------------------------------
         t1 = TransformStamped()
         t1.header.stamp = now
-        t1.header.frame_id = 'world'
-        t1.child_frame_id = 'isaac_world'
+        t1.header.frame_id = 'isaac_world'  # 这里的 base_link 是 URDF 中定义的 base_link
+        t1.child_frame_id = 'base_link'
 
         t1.transform.translation.x = 0.0
         t1.transform.translation.y = 0.0
