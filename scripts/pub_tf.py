@@ -44,25 +44,32 @@ class BaseToVirtualLinkPublisher(Node):
     def publish_transforms(self):
         now = self.get_clock().now().to_msg()
         transforms = []
+        
+        '''
+        在当前设置下，两个坐标系重合，所以不再发布两者关系，直接使用base_link即可
+        这个关系是由在isaac sim中载入的usd模型的位姿，以及urdf中定义的base_link
+        的位姿决定，urdf一般不会修改，如果在usd中修改了模型的位姿，需要在这里同步
+        修改。
+        '''
+        
+        # # -------------------------------
+        # # TF1: world -> isaac_world
+        # # -------------------------------
+        # t1 = TransformStamped()
+        # t1.header.stamp = now
+        # t1.header.frame_id = 'isaac_world'  # 这里的 base_link 是 URDF 中定义的 base_link
+        # t1.child_frame_id = 'base_link'
 
-        # -------------------------------
-        # TF1: world -> isaac_world
-        # -------------------------------
-        t1 = TransformStamped()
-        t1.header.stamp = now
-        t1.header.frame_id = 'isaac_world'  # 这里的 base_link 是 URDF 中定义的 base_link
-        t1.child_frame_id = 'base_link'
+        # t1.transform.translation.x = 0.0
+        # t1.transform.translation.y = 0.0
+        # t1.transform.translation.z = 0.0
 
-        t1.transform.translation.x = 0.0
-        t1.transform.translation.y = 0.0
-        t1.transform.translation.z = 0.0
-
-        q1 = transforms3d.euler.euler2quat(0, 0, math.radians(0))  # 两个坐标系重合，这个关系是由在isaac sim中载入的usd模型的位姿，以及urdf中定义的base_link位姿决定的，urdf一般不会修改，如果在usd中修改了模型的位姿，需要在这里同步修改
-        t1.transform.rotation.x = q1[1]
-        t1.transform.rotation.y = q1[2]
-        t1.transform.rotation.z = q1[3]
-        t1.transform.rotation.w = q1[0]
-        transforms.append(t1)
+        # q1 = transforms3d.euler.euler2quat(0, 0, math.radians(0)) 
+        # t1.transform.rotation.x = q1[1]
+        # t1.transform.rotation.y = q1[2]
+        # t1.transform.rotation.z = q1[3]
+        # t1.transform.rotation.w = q1[0]
+        # transforms.append(t1)
 
         # -------------------------------
         # TF2: tool0 -> camera_link
