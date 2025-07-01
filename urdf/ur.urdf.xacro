@@ -151,8 +151,27 @@
   <!-- Import macros -->
   <xacro:include filename="$(find robotiq_description)/urdf/robotiq_2f_85_macro.urdf.xacro" />
 
-  <xacro:robotiq_gripper name="RobotiqGripperHardwareInterface" prefix="" parent="tool0" use_fake_hardware="$(arg use_fake_hardware)" com_port="$(arg com_port)">
+  <link name="camera"/>
+    <joint name="camera_joint" type="fixed">
+        <origin xyz="0 0 0.005" rpy="0 0 0"/>
+        <parent link="tool0"/>
+        <child link="camera"/>
+    </joint>
+
+  <link name="force_sensor"/>
+    <joint name="force_sensor_joint" type="fixed">
+        <origin xyz="0 0 0.045" rpy="0 0 0"/>
+        <parent link="camera"/>
+        <child link="force_sensor"/>
+    </joint>
+
+  <xacro:robotiq_gripper name="RobotiqGripperHardwareInterface" prefix="" parent="force_sensor" use_fake_hardware="$(arg use_fake_hardware)" com_port="$(arg com_port)">
       <origin xyz="0 0 0" rpy="0 0 0" />
   </xacro:robotiq_gripper>
-
+  <link name="finger_center"/>
+    <joint name="finger_center_joint" type="fixed">
+        <origin xyz="0 0 0.20" rpy="0 0 0"/>
+        <parent link="tool0"/>
+        <child link="finger_center"/>
+    </joint>
 </robot>
