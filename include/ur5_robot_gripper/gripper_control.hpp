@@ -3,7 +3,7 @@
 
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
-#include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit/move_group_interface/move_group_interface.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include "ur5_robot_gripper/action/move_gripper_action.hpp"  // Action definition for moving the gripper
 
