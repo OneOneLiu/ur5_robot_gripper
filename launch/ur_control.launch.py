@@ -415,6 +415,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "ur_type",
+            default_value="ur5",
             description="Type/series of used UR robot.",
             choices=[
                 "ur3",
@@ -443,7 +444,8 @@ def generate_launch_description():
 
     declared_arguments.append(
         DeclareLaunchArgument(
-            "robot_ip", description="IP address by which the robot can be reached."
+            "robot_ip", description="IP address by which the robot can be reached.",
+            default_value="169.254.100.182"
         )
     )
     declared_arguments.append(
