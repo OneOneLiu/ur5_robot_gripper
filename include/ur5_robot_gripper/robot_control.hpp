@@ -4,13 +4,13 @@
 #include <memory>
 #include <optional>  // 引入 std::optional
 #include <rclcpp/rclcpp.hpp>
-#include <moveit/move_group_interface/move_group_interface.h>
-#include <moveit_visual_tools/moveit_visual_tools.h>
+#include "moveit/move_group_interface/move_group_interface.hpp"
+#include "moveit_visual_tools/moveit_visual_tools.h"
 #include <geometry_msgs/msg/pose.hpp>
-#include <moveit/planning_scene_interface/planning_scene_interface.h>
-#include <moveit/planning_scene/planning_scene.h>
-#include <moveit/robot_model_loader/robot_model_loader.h>
-#include <moveit/robot_state/robot_state.h>
+#include "moveit/planning_scene_interface/planning_scene_interface.hpp"
+#include "moveit/planning_scene/planning_scene.hpp"
+#include <moveit/robot_model_loader/robot_model_loader.hpp>
+#include <moveit/robot_state/robot_state.hpp>
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "ur5_robot_gripper/srv/print_pose.hpp"  // Custom service for printing the pose
 #include "ur5_robot_gripper/srv/move_to_position.hpp"  // Custom service for moving to a position

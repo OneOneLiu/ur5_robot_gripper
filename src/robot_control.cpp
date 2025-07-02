@@ -100,7 +100,7 @@ void RobotMover::savePlanToJson(const moveit::planning_interface::MoveGroupInter
 {
     nlohmann::json json_plan;
 
-    for (const auto &point : plan.trajectory_.joint_trajectory.points)
+    for (const auto &point : plan.trajectory.joint_trajectory.points)
     {
         nlohmann::json json_point;
         json_point["time_from_start"] = point.time_from_start.sec + point.time_from_start.nanosec * 1e-9;
@@ -232,7 +232,7 @@ RobotMover::genPlan(double velocity_scaling)
   bool success = static_cast<bool>(move_group_interface_.plan(plan));
   joint_model_group_ = move_group_interface_.getCurrentState()->getJointModelGroup("manipulator");
   visual_tools_.deleteAllMarkers();
-  visual_tools_.publishTrajectoryLine(plan.trajectory_, joint_model_group_);
+  visual_tools_.publishTrajectoryLine(plan.trajectory, joint_model_group_);
   visual_tools_.trigger();
   RCLCPP_INFO(rclcpp::get_logger("robot_control"), "Visualized the plan in Rviz");
   // Save the plan to JSON for debugging
@@ -389,7 +389,7 @@ void RobotMover::handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::
                     RCLCPP_INFO(this->get_logger(), "Motion plan succeeded using planner %s .", planner.c_str());
                     response->success = true;
                     response->message = "Motion plan generated successfully.";
-                    response->trajectory = current_plan_.trajectory_.joint_trajectory;
+                    response->trajectory = current_plan_.trajectory.joint_trajectory;
                     // 恢复默认规划器
                     move_group_interface_.setPlannerId(default_planner);
                     return;
@@ -405,7 +405,7 @@ void RobotMover::handleMovePoseRequest(const std::shared_ptr<ur5_robot_gripper::
         else {
             response->success = true;
             response->message = "Motion plan generated successfully.";
-            response->trajectory = current_plan_.trajectory_.joint_trajectory;
+            response->trajectory = current_plan_.trajectory.joint_trajectory;
         }
     }
 
@@ -422,7 +422,7 @@ void RobotMover::handleMoveJointPositionRequest(const std::shared_ptr<ur5_robot_
         {
             response->success = true;
             response->message = "Motion plan generated successfully.";
-            response->trajectory = current_plan_.trajectory_.joint_trajectory;
+            response->trajectory = current_plan_.trajectory.joint_trajectory;
         }
     }
 
