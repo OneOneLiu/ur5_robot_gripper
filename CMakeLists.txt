@@ -33,6 +33,8 @@ endforeach()
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StringArray.msg"
+  "msg/BoundingBox2D.msg"
+  "msg/BoundingBoxes2D.msg"
   "srv/PoseTransform.srv"
   "srv/MoveToPose.srv"
   "srv/MoveToPosition.srv"
