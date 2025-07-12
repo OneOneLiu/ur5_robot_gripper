@@ -41,9 +41,24 @@ RUN mkdir -p /catkin_ws/src && \
     apt-get install -y python3-tk && \
     apt-get install -y ros-noetic-ros-control ros-noetic-ros-controllers
 
-# Clone my custimized repositories
+# Intel realsense camera
+RUN apt-get install -y ros-$ROS_DISTRO-realsense2-camera && \
+    apt-get install -y libcanberra-gtk-module libcanberra-gtk3-module && \
+    pip3 install pyrealsense2 && \
+    pip3 install imageio && \
+    mkdir -p /catkin_ws/src && \
+    cd /catkin_ws/src && \
+    git clone -b upstream https://github.com/pal-robotics-forks/realsense.git && \
+    cp -r realsense/realsense2_description/ . && \
+    rm -rf realsense && \
+    git clone https://github.com/pal-robotics/realsense_gazebo_plugin
+
+
+# For hand-eye calibration
 RUN cd /catkin_ws/src && \
-    git clone https://github.com/OneOneLiu/robotiq_gripper.git && \
+    git clone -b noetic-devel https://github.com/pal-robotics/aruco_ros.git && \
+    git clone -b noetic-devel https://github.com/lagadic/vision_visp.git && \
+    git clone https://github.com/IFL-CAMP/easy_handeye.git && \
     git clone https://github.com/OneOneLiu/ur5_robot.git && \
     git clone https://github.com/OneOneLiu/ur5_gripper_moveit.git
 
