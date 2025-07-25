@@ -5,32 +5,25 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)
-
 # find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(moveit_ros_planning_interface REQUIRED)
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
-
-# Generate custom ROS messages
-find_package(rosidl_default_generators REQUIRED)
-find_package(action_msgs REQUIRED)
-# For debugging
-find_package(nlohmann_json REQUIRED)
-
-set(THIS_PACKAGE_INCLUDE_DEPENDS
-ament_cmake
-Boost
-Eigen3
-moveit_visual_tools
-rviz_visual_tools
+set(THIS_PACKAGE_DEPENDS
+  ament_cmake
+  Boost
+  Eigen3
+  moveit_visual_tools
+  rviz_visual_tools
+  rclcpp
+  moveit_ros_planning_interface
+  Python3
+  rosidl_default_generators
+  action_msgs
+  nlohmann_json
 )
-
-foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
-find_package(${Dependency} REQUIRED)
+foreach(Dependency IN ITEMS ${THIS_PACKAGE_DEPENDS})
+  find_package(${Dependency} REQUIRED)
 endforeach()
 
+# Generate custom ROS messages
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StringArray.msg"
   "msg/BoundingBox2D.msg"
@@ -49,119 +42,65 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES builtin_interfaces geometry_msgs action_msgs trajectory_msgs
 )
 
-# Build a robot_control c++ library
-add_library(robot_control STATIC src/robot_control.cpp)
-target_include_directories(robot_control PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(robot_control PUBLIC cxx_std_17)  # Require C++17
-ament_target_dependencies(
-  robot_control
-  "rclcpp"
-  "moveit_ros_planning_interface"
-  "rosidl_typesupport_cpp"
-  ${THIS_PACKAGE_INCLUDE_DEPENDS}
-  Boost
-)
+# Macro to reduce target重复代码
+macro(add_my_library name src)
+  add_library(${name} STATIC ${src})
+  target_include_directories(${name} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    ${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)
+  target_compile_features(${name} PUBLIC cxx_std_17)
+  ament_target_dependencies(${name}
+    rclcpp
+    moveit_ros_planning_interface
+    rosidl_typesupport_cpp
+    Boost
+    Eigen3
+    moveit_visual_tools
+    rviz_visual_tools
+  )
+  target_link_libraries(${name} ${PROJECT_NAME}__rosidl_typesupport_cpp)
+endmacro()
 
-# Obtain the typesupport target
-target_link_libraries(robot_control ${PROJECT_NAME}__rosidl_typesupport_cpp)
+macro(add_my_executable name src link_libs)
+  add_executable(${name} ${src})
+  target_include_directories(${name} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    ${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)
+  target_compile_features(${name} PUBLIC cxx_std_17)
+  ament_target_dependencies(${name}
+    rclcpp
+    moveit_ros_planning_interface
+    geometry_msgs
+    rclcpp_action
+  )
+  target_link_libraries(${name} ${link_libs} ${PROJECT_NAME}__rosidl_typesupport_cpp)
+endmacro()
 
-# Build a robot_control service c++ executable
-add_executable(robot_control_node src/robot_control_node.cpp)
-target_include_directories(robot_control_node PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(robot_control_node PUBLIC cxx_std_17)  # Require C++17
-ament_target_dependencies(
+# Libraries
+add_my_library(robot_control src/robot_control.cpp)
+add_my_library(robot_control_real src/robot_control_real.cpp)
+add_my_library(gripper_control src/gripper_control.cpp)
+
+# Executables
+add_my_executable(robot_control_node src/robot_control_node.cpp robot_control)
+add_my_executable(robot_function_test src/robot_function_test.cpp robot_control)
+add_my_executable(robot_control_node_real src/robot_control_node_real.cpp robot_control_real)
+add_my_executable(robot_function_test_real src/robot_function_test_real.cpp robot_control_real)
+add_my_executable(gripper_control_node src/gripper_control_node.cpp gripper_control)
+
+# Install all executables
+install(TARGETS
   robot_control_node
-  "rclcpp"
-  "moveit_ros_planning_interface"
-  "geometry_msgs"
-  "rclcpp_action"
-)
-
-target_link_libraries(robot_control_node robot_control)
-
-target_link_libraries(robot_control_node ${PROJECT_NAME}__rosidl_typesupport_cpp)
-
-# Install the library and executable
-install(TARGETS robot_control_node
-  DESTINATION lib/${PROJECT_NAME})
-
-# Build a robot_control test c++ executable
-add_executable(robot_function_test src/robot_function_test.cpp)
-target_include_directories(robot_function_test PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(robot_function_test PUBLIC cxx_std_17)  # Require C++17
-ament_target_dependencies(
   robot_function_test
-  "rclcpp"
-  "moveit_ros_planning_interface"
-  "geometry_msgs"
-)
-target_link_libraries(robot_function_test robot_control)
-
-# Obtain the typesupport target
-target_link_libraries(robot_function_test ${PROJECT_NAME}__rosidl_typesupport_cpp)
-
-# Install the library and executable
-install(TARGETS robot_function_test
-  DESTINATION lib/${PROJECT_NAME})
-
-
-################## Add the gripper_control node ##################
-# Build a gripper_control c++ library
-add_library(gripper_control STATIC src/gripper_control.cpp)
-target_include_directories(gripper_control PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(gripper_control PUBLIC cxx_std_17)  # Require C++17
-ament_target_dependencies(
-  gripper_control
-  "rclcpp"
-  "moveit_ros_planning_interface"
-)
-
-target_link_libraries(gripper_control ${PROJECT_NAME}__rosidl_typesupport_cpp)
-
-# Build a gripper_control service c++ executable
-add_executable(gripper_control_node src/gripper_control_node.cpp)
-target_include_directories(gripper_control_node PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(gripper_control_node PUBLIC cxx_std_17)  # Require C++17
-ament_target_dependencies(
+  robot_control_node_real
+  robot_function_test_real
   gripper_control_node
-  "rclcpp"
-  "moveit_ros_planning_interface"
-  "geometry_msgs"
-  "rclcpp_action"
+  DESTINATION lib/${PROJECT_NAME}
 )
-target_link_libraries(gripper_control_node gripper_control)
-target_link_libraries(gripper_control_node ${PROJECT_NAME}__rosidl_typesupport_cpp)
 
-# Install the library and executable
-install(TARGETS gripper_control_node
-  DESTINATION lib/${PROJECT_NAME})
-
-################## Add the gripper_control node ##################
-
-# add_executable(gripper_control src/gripper_control.cpp)
-# target_include_directories(gripper_control PUBLIC
-#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-#   $<INSTALL_INTERFACE:include>)
-# target_compile_features(gripper_control PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-# ament_target_dependencies(
-#   gripper_control
-#   "moveit_ros_planning_interface"
-#   "rclcpp"
-# )
-# install(TARGETS gripper_control
-#   DESTINATION lib/${PROJECT_NAME})
-
-# Install folders
+# Install scripts and folders
 install(PROGRAMS
   scripts/pub_tf.py
   scripts/pose_transform_server.py
@@ -169,35 +108,15 @@ install(PROGRAMS
   scripts/fake_sim_time.py
   DESTINATION lib/${PROJECT_NAME}
 )
-install(DIRECTORY
-  launch
-  DESTINATION share/${PROJECT_NAME}/
-)
-install(DIRECTORY
-  meshes
-  DESTINATION share/${PROJECT_NAME}/
-)
-install(DIRECTORY
-  urdf
-  DESTINATION share/${PROJECT_NAME}/
-)
-install(DIRECTORY
-  config
-  DESTINATION share/${PROJECT_NAME}/
-)
-install(DIRECTORY
-  include/
-  DESTINATION share/${PROJECT_NAME}/
-)
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/)
+install(DIRECTORY meshes DESTINATION share/${PROJECT_NAME}/)
+install(DIRECTORY urdf DESTINATION share/${PROJECT_NAME}/)
+install(DIRECTORY config DESTINATION share/${PROJECT_NAME}/)
+install(DIRECTORY include/ DESTINATION share/${PROJECT_NAME}/)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()

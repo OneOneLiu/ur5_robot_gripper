@@ -30,10 +30,27 @@ def quaternion_from_euler(ai, aj, ak):
     q[3] = cj * cc + sj * ss
     return q
 
-class BaseToVirtualLinkPublisher(Node):
+def build_transforms(parent_frame_id, child_frame_id, translation, quaternion, timestamp):
+    t = TransformStamped()
+    t.header.stamp = timestamp
+    t.header.frame_id = parent_frame_id
+    t.child_frame_id = child_frame_id
+
+    t.transform.translation.x = translation[0]
+    t.transform.translation.y = translation[1]
+    t.transform.translation.z = translation[2]
+
+    t.transform.rotation.x = quaternion[1]
+    t.transform.rotation.y = quaternion[2]
+    t.transform.rotation.z = quaternion[3]
+    t.transform.rotation.w = quaternion[0]
+
+    return t
+
+class StaticTFPublisher(Node):
 
     def __init__(self):
-        super().__init__('base_to_virtual_link_publisher')
+        super().__init__('static_tf_publisher')
 
         # 初始化 TF 广播器
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -42,7 +59,6 @@ class BaseToVirtualLinkPublisher(Node):
         self.timer = self.create_timer(0.01, self.publish_transforms)
 
     def publish_transforms(self):
-        now = self.get_clock().now().to_msg()
         transforms = []
         
         '''
@@ -51,43 +67,18 @@ class BaseToVirtualLinkPublisher(Node):
         的位姿决定，urdf一般不会修改，如果在usd中修改了模型的位姿，需要在这里同步
         修改。
         '''
+        timestamp = self.get_clock().now().to_msg()
         
         # # -------------------------------
         # # TF1: world -> isaac_world
         # # -------------------------------
-        # t1 = TransformStamped()
-        # t1.header.stamp = now
-        # t1.header.frame_id = 'isaac_world'  # 这里的 base_link 是 URDF 中定义的 base_link
-        # t1.child_frame_id = 'base_link'
-
-        # t1.transform.translation.x = 0.0
-        # t1.transform.translation.y = 0.0
-        # t1.transform.translation.z = 0.0
-
-        # q1 = transforms3d.euler.euler2quat(0, 0, math.radians(0)) 
-        # t1.transform.rotation.x = q1[1]
-        # t1.transform.rotation.y = q1[2]
-        # t1.transform.rotation.z = q1[3]
-        # t1.transform.rotation.w = q1[0]
+        # t1 = build_transforms('world', 'base_link', [0.0, 0.0, 0.0], transforms3d.euler.euler2quat(0, 0, math.radians(0)), timestamp)
         # transforms.append(t1)
-
+        
         # -------------------------------
         # TF2: tool0 -> camera_link
         # -------------------------------
-        t2 = TransformStamped()
-        t2.header.stamp = now
-        t2.header.frame_id = 'tool0'
-        t2.child_frame_id = 'camera_link'
-
-        t2.transform.translation.x = 0.0
-        t2.transform.translation.y = -0.1
-        t2.transform.translation.z = 0.0
-
-        q2 = transforms3d.euler.euler2quat(0, 0, math.radians(90)) 
-        t2.transform.rotation.x = q2[1]
-        t2.transform.rotation.y = q2[2]
-        t2.transform.rotation.z = q2[3]
-        t2.transform.rotation.w = q2[0]
+        t2 = build_transforms('tool0', 'camera_link', [0.0, -0.1, 0.0], transforms3d.euler.euler2quat(0, 0, math.radians(90)), timestamp)
         transforms.append(t2)
 
         # ✅ 一次性广播所有 TF
@@ -95,7 +86,7 @@ class BaseToVirtualLinkPublisher(Node):
 
 def main():
     rclpy.init()
-    node = BaseToVirtualLinkPublisher()
+    node = StaticTFPublisher()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

@@ -878,9 +878,10 @@
     <mimic joint="robotiq_85_left_knuckle_joint"/>
   </joint>
 
+  <!-- change this together with the xacro file: ur.urdf.xacro -->
   <link name="finger_center"/>
     <joint name="finger_center_joint" type="fixed">
-        <origin xyz="0 0 0.20" rpy="0 0 0"/>
+        <origin xyz="0 0 0.208" rpy="0 0 0"/>
         <parent link="tool0"/>
         <child link="finger_center"/>
     </joint>
