@@ -24,7 +24,7 @@ RobotMover::RobotMover(const rclcpp::NodeOptions &options)
 
     // 创建一个话题，用于发布当前姿态
     pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
-        "/current_pose", 10);
+        "/current_robot_pose", 10);
 
     // 创建一个 100ms 周期的定时器，回调里读 move_group_interface_ 并发布
     pose_timer_ = this->create_wall_timer(
