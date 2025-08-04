@@ -160,7 +160,7 @@
         </geometry>
     </visual>
     <collision>
-        <origin rpy="1.5707963267948966 0 0" xyz="0 0 -0.005"/>
+        <origin rpy="-1.5707963267948966 0 0" xyz="0 0 -0.005"/>
         <geometry>
             <mesh filename="package://ur5_robot_gripper/meshes/realsense/collision/realsense.stl"/>
         </geometry>
