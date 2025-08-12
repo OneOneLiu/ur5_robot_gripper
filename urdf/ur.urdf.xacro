@@ -249,8 +249,8 @@
   <!-- change this together with the xacro file: ur_robotiq.urdf because moveit with use the urdf file to generate the ik solver -->
   <link name="finger_center"/>
     <joint name="finger_center_joint" type="fixed">
-        <origin xyz="0 0 0.208" rpy="0 0 0"/>
-        <parent link="tool0"/>
+        <origin xyz="0 0 0.16" rpy="0 0 0"/>
+        <parent link="robotiq_ft_frame_id"/>
         <child link="finger_center"/>
     </joint>
 </robot>
